@@ -1,0 +1,233 @@
+{
+  "app": {
+    "name": "GRRK",
+    "tagline": "Government Relations Intelligence Platform"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "employees": "Employees",
+    "companies": "Companies",
+    "organizations": "Organizations",
+    "contractors": "Contractors",
+    "visitors": "Visitors",
+    "documents": "Documents",
+    "compliance": "Compliance",
+    "notifications": "Notifications",
+    "reports": "Reports",
+    "workflow": "Workflow",
+    "configuration": "Configuration Center",
+    "systemHealth": "System Health",
+    "more": "More"
+  },
+  "status": {
+    "valid": "Valid",
+    "expiringSoon": "Expiring Soon",
+    "expired": "Expired",
+    "information": "Information",
+    "inactive": "Inactive"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "export": "Export",
+    "print": "Print",
+    "discard": "Discard Changes",
+    "download": "Download"
+  },
+  "validation": {
+    "required": "This field is required",
+    "duplicateNationalId": "This National ID already exists",
+    "invalidDateRange": "Issue date must be before expiry date",
+    "invalidEmail": "Enter a valid email address"
+  },
+  "common": {
+    "loading": "Loading…",
+    "close": "Close",
+    "switchLanguage": "Switch language",
+    "emptyList": "No records yet.",
+    "noSearchResults": "No records match your search.",
+    "requiredFieldsHint": "* Required fields",
+    "timeline": "Timeline",
+    "noActivityYet": "No activity yet."
+  },
+  "messages": {
+    "saved": "Saved successfully.",
+    "created": "Created successfully.",
+    "saveFailed": "Something went wrong while saving. Please try again.",
+    "deleted": "Deleted successfully.",
+    "deleteFailed": "Something went wrong while deleting. Please try again.",
+    "confirmDeleteTitle": "Delete this record?",
+    "confirmDeleteMessage": "This action cannot be undone.",
+    "confirmDiscardTitle": "Discard unsaved changes?",
+    "confirmDiscardMessage": "You have unsaved changes. If you leave now, they will be lost."
+  },
+  "employees": {
+    "sections": {
+      "identity": "Identity",
+      "contact": "Contact",
+      "employment": "Employment"
+    },
+    "fields": {
+      "fullNameAr": "Full Name (Arabic)",
+      "fullNameEn": "Full Name (English)",
+      "nationalId": "National ID",
+      "profession": "Profession",
+      "nationality": "Nationality",
+      "mobileNumber": "Mobile Number",
+      "email": "Email",
+      "department": "Department",
+      "notes": "Notes"
+    }
+  },
+  "documents": {
+    "documentNumber": "Document Number",
+    "issueDate": "Issue Date",
+    "expiryDate": "Expiry Date",
+    "notes": "Notes",
+    "add": "Add Document",
+    "none": "No document on file yet.",
+    "attachments": "Attachments",
+    "noAttachments": "No files attached yet.",
+    "uploadFile": "Upload File",
+    "attachmentUploaded": "File uploaded successfully.",
+    "attachmentUploadFailed": "Something went wrong while uploading. Please try again.",
+    "attachmentReplaced": "File replaced successfully.",
+    "attachmentReplaceFailed": "Something went wrong while replacing the file. Please try again.",
+    "fileSize": "File Size",
+    "uploadedAt": "Uploaded",
+    "uploadedBy": "Uploaded By",
+    "unknownUploader": "Unknown",
+    "previewUnavailable": "Preview isn't available for this file type. Use Download instead.",
+    "replaceFile": "Replace File",
+    "types": {
+      "nationalId": "National ID",
+      "iqama": "Iqama",
+      "passport": "Passport",
+      "drivingLicense": "Driving License",
+      "vehicleRegistration": "Vehicle Registration",
+      "vehicleInsurance": "Vehicle Insurance",
+      "medicalInsurance": "Medical Insurance",
+      "workPermit": "Work Permit",
+      "companyDocument": "Company Document"
+    }
+  },
+  "compliance": {
+    "restrictedProfessionWarning": "This employee's profession is on the Restricted Professions list.",
+    "overallScore": "Compliance Score",
+    "employees": "employees",
+    "expiringWithin30": "Expiring Within 30 Days",
+    "expiringWithin60": "Expiring Within 60 Days",
+    "expiringWithin90": "Expiring Within 90 Days",
+    "restrictedProfessionsList": "Restricted Professions",
+    "missingDocumentsList": "Missing Documents",
+    "duplicateRecordsList": "Duplicate Records",
+    "timeline": "Compliance Activity",
+    "none": "None."
+  },
+  "notifications": {
+    "documentExpired": "A document has expired",
+    "documentExpiringSoon30": "A document is expiring within 30 days",
+    "documentExpiringSoon60": "A document is expiring within 60 days",
+    "documentExpiringSoon90": "A document is expiring within 90 days",
+    "restrictedProfession": "Employee has a restricted profession",
+    "missingDocument": "Employee is missing required documents",
+    "duplicateRecord": "Duplicate National ID detected",
+    "markAsRead": "Mark as Read",
+    "category": {
+      "expired": "Expired",
+      "expiringSoon30": "30-Day Notice",
+      "expiringSoon60": "60-Day Notice",
+      "expiringSoon90": "90-Day Notice",
+      "restrictedProfession": "Restricted Profession",
+      "missingDocument": "Missing Document",
+      "duplicateRecord": "Duplicate Record",
+      "system": "System"
+    }
+  },
+  "reports": {
+    "employeeDirectory": "Employee Directory",
+    "documentExpiry": "Document Expiry Report",
+    "restrictedProfessions": "Restricted Professions Report",
+    "missingDocuments": "Missing Documents Report",
+    "complianceSummary": "Compliance Summary Report",
+    "exportCsv": "Export CSV",
+    "exportFailed": "Something went wrong generating this report. Please try again.",
+    "groupEmployee": "Employee Reports",
+    "groupCompliance": "Compliance Reports",
+    "employeeDirectoryDescription": "Every active employee with their profession and contact details.",
+    "documentExpiryDescription": "All documents that are expired or expiring soon, across every employee.",
+    "restrictedProfessionsDescription": "Employees whose profession is on the Restricted Professions list.",
+    "missingDocumentsDescription": "Employees missing at least one required document.",
+    "complianceSummaryDescription": "Every employee's Compliance Score and duplicate-record status in one place."
+  },
+  "timeline": {
+    "audit": {
+      "create": "Record created",
+      "update": "Record updated",
+      "delete": "Record deleted",
+      "upload": "File uploaded",
+      "download": "File downloaded",
+      "view": "Previewed",
+      "statusChange": "Status changed",
+      "login": "Signed in",
+      "logout": "Signed out"
+    },
+    "document": {
+      "updated": "Document updated"
+    },
+    "communication": {
+      "voiceRecording": "Voice recording added",
+      "meetingNote": "Meeting note added",
+      "internalNote": "Internal note added"
+    }
+  },
+  "dashboard": {
+    "complianceScore": "Compliance Score",
+    "complianceSnapshot": "Compliance Snapshot",
+    "restrictedProfessions": "Restricted Professions",
+    "missingDocuments": "Missing Documents",
+    "recentNotifications": "Recent Notifications",
+    "noNotifications": "No notifications yet.",
+    "noWidgets": "No dashboard widgets are registered.",
+    "quickActionAddEmployee": "+ Add Employee",
+    "quickActionViewCompliance": "View Compliance Center",
+    "quickActionViewReports": "View Reports"
+  },
+  "systemHealth": {
+    "title": "System Health",
+    "storage": "Storage",
+    "records": "Records",
+    "activeUsers": "Active Users",
+    "backgroundJobs": "Background Jobs",
+    "syncStatus": "Synchronization Status",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "backupStatus": "Backup Status",
+    "auditStatistics": "Audit Statistics",
+    "attachments": "Attachments",
+    "blobs": "Blobs",
+    "usage": "Usage",
+    "notAvailable": "n/a",
+    "notificationEvaluation": "Notification evaluation",
+    "workflowSlaCheck": "Workflow SLA check",
+    "mode": "Mode",
+    "pendingOfflineWrites": "Pending offline writes",
+    "none": "None",
+    "notScheduled": "Not yet scheduled",
+    "syncModeLocalOnly": "Local only",
+    "backupAvailable": "Available",
+    "backupUnavailableReason": "Backups require Cloud Migration (see Implementation Blueprint, Section 13)",
+    "recordLabels": {
+      "persons": "People",
+      "companies": "Companies",
+      "organizations": "Organizations",
+      "documents": "Documents",
+      "communicationEntries": "Communication Entries",
+      "masterDataRecords": "Master Data Records"
+    }
+  }
+}

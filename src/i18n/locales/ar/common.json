@@ -1,0 +1,233 @@
+{
+  "app": {
+    "name": "جرك",
+    "tagline": "منصة استخبارات العلاقات الحكومية"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "employees": "الموظفون",
+    "companies": "الشركات",
+    "organizations": "المؤسسات",
+    "contractors": "المقاولون",
+    "visitors": "الزوار",
+    "documents": "المستندات",
+    "compliance": "الامتثال",
+    "notifications": "الإشعارات",
+    "reports": "التقارير",
+    "workflow": "سير العمل",
+    "configuration": "مركز الإعدادات",
+    "systemHealth": "صحة النظام",
+    "more": "المزيد"
+  },
+  "status": {
+    "valid": "ساري",
+    "expiringSoon": "قارب على الانتهاء",
+    "expired": "منتهي",
+    "information": "معلومة",
+    "inactive": "غير نشط"
+  },
+  "actions": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "create": "إنشاء",
+    "search": "بحث",
+    "export": "تصدير",
+    "print": "طباعة",
+    "discard": "تجاهل التغييرات",
+    "download": "تنزيل"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "duplicateNationalId": "رقم الهوية الوطنية موجود مسبقاً",
+    "invalidDateRange": "يجب أن يكون تاريخ الإصدار قبل تاريخ الانتهاء",
+    "invalidEmail": "أدخل بريداً إلكترونياً صحيحاً"
+  },
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "close": "إغلاق",
+    "switchLanguage": "تبديل اللغة",
+    "emptyList": "لا توجد سجلات بعد.",
+    "noSearchResults": "لا توجد سجلات مطابقة لبحثك.",
+    "requiredFieldsHint": "* الحقول المطلوبة",
+    "timeline": "السجل الزمني",
+    "noActivityYet": "لا يوجد نشاط بعد."
+  },
+  "messages": {
+    "saved": "تم الحفظ بنجاح.",
+    "created": "تم الإنشاء بنجاح.",
+    "saveFailed": "حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.",
+    "deleted": "تم الحذف بنجاح.",
+    "deleteFailed": "حدث خطأ أثناء الحذف. يرجى المحاولة مرة أخرى.",
+    "confirmDeleteTitle": "هل تريد حذف هذا السجل؟",
+    "confirmDeleteMessage": "لا يمكن التراجع عن هذا الإجراء.",
+    "confirmDiscardTitle": "هل تريد تجاهل التغييرات غير المحفوظة؟",
+    "confirmDiscardMessage": "لديك تغييرات غير محفوظة. إذا غادرت الآن، ستفقد هذه التغييرات."
+  },
+  "employees": {
+    "sections": {
+      "identity": "الهوية",
+      "contact": "التواصل",
+      "employment": "التوظيف"
+    },
+    "fields": {
+      "fullNameAr": "الاسم الكامل (عربي)",
+      "fullNameEn": "الاسم الكامل (إنجليزي)",
+      "nationalId": "رقم الهوية الوطنية",
+      "profession": "المهنة",
+      "nationality": "الجنسية",
+      "mobileNumber": "رقم الجوال",
+      "email": "البريد الإلكتروني",
+      "department": "القسم",
+      "notes": "ملاحظات"
+    }
+  },
+  "documents": {
+    "documentNumber": "رقم المستند",
+    "issueDate": "تاريخ الإصدار",
+    "expiryDate": "تاريخ الانتهاء",
+    "notes": "ملاحظات",
+    "add": "إضافة مستند",
+    "none": "لا يوجد مستند مسجل بعد.",
+    "attachments": "المرفقات",
+    "noAttachments": "لا توجد ملفات مرفقة بعد.",
+    "uploadFile": "رفع ملف",
+    "attachmentUploaded": "تم رفع الملف بنجاح.",
+    "attachmentUploadFailed": "حدث خطأ أثناء الرفع. يرجى المحاولة مرة أخرى.",
+    "attachmentReplaced": "تم استبدال الملف بنجاح.",
+    "attachmentReplaceFailed": "حدث خطأ أثناء استبدال الملف. يرجى المحاولة مرة أخرى.",
+    "fileSize": "حجم الملف",
+    "uploadedAt": "تاريخ الرفع",
+    "uploadedBy": "رفعه",
+    "unknownUploader": "غير معروف",
+    "previewUnavailable": "المعاينة غير متاحة لنوع هذا الملف. استخدم التنزيل بدلاً من ذلك.",
+    "replaceFile": "استبدال الملف",
+    "types": {
+      "nationalId": "الهوية الوطنية",
+      "iqama": "الإقامة",
+      "passport": "جواز السفر",
+      "drivingLicense": "رخصة القيادة",
+      "vehicleRegistration": "استمارة المركبة",
+      "vehicleInsurance": "تأمين المركبة",
+      "medicalInsurance": "التأمين الطبي",
+      "workPermit": "تصريح العمل",
+      "companyDocument": "مستند الشركة"
+    }
+  },
+  "compliance": {
+    "restrictedProfessionWarning": "مهنة هذا الموظف مدرجة ضمن قائمة المهن المقيدة.",
+    "overallScore": "درجة الامتثال",
+    "employees": "موظف",
+    "expiringWithin30": "ينتهي خلال 30 يوماً",
+    "expiringWithin60": "ينتهي خلال 60 يوماً",
+    "expiringWithin90": "ينتهي خلال 90 يوماً",
+    "restrictedProfessionsList": "المهن المقيدة",
+    "missingDocumentsList": "المستندات الناقصة",
+    "duplicateRecordsList": "السجلات المكررة",
+    "timeline": "نشاط الامتثال",
+    "none": "لا يوجد."
+  },
+  "notifications": {
+    "documentExpired": "انتهت صلاحية أحد المستندات",
+    "documentExpiringSoon30": "أحد المستندات ينتهي خلال 30 يوماً",
+    "documentExpiringSoon60": "أحد المستندات ينتهي خلال 60 يوماً",
+    "documentExpiringSoon90": "أحد المستندات ينتهي خلال 90 يوماً",
+    "restrictedProfession": "الموظف يعمل في مهنة مقيدة",
+    "missingDocument": "الموظف ينقصه مستندات مطلوبة",
+    "duplicateRecord": "تم اكتشاف رقم هوية وطنية مكرر",
+    "markAsRead": "تحديد كمقروء",
+    "category": {
+      "expired": "منتهي",
+      "expiringSoon30": "تنبيه 30 يوماً",
+      "expiringSoon60": "تنبيه 60 يوماً",
+      "expiringSoon90": "تنبيه 90 يوماً",
+      "restrictedProfession": "مهنة مقيدة",
+      "missingDocument": "مستند مفقود",
+      "duplicateRecord": "سجل مكرر",
+      "system": "النظام"
+    }
+  },
+  "reports": {
+    "employeeDirectory": "دليل الموظفين",
+    "documentExpiry": "تقرير انتهاء المستندات",
+    "restrictedProfessions": "تقرير المهن المقيدة",
+    "missingDocuments": "تقرير المستندات الناقصة",
+    "complianceSummary": "تقرير ملخص الامتثال",
+    "exportCsv": "تصدير CSV",
+    "exportFailed": "حدث خطأ أثناء إنشاء هذا التقرير. يرجى المحاولة مرة أخرى.",
+    "groupEmployee": "تقارير الموظفين",
+    "groupCompliance": "تقارير الامتثال",
+    "employeeDirectoryDescription": "جميع الموظفين النشطين مع مهنتهم وبيانات التواصل الخاصة بهم.",
+    "documentExpiryDescription": "جميع المستندات المنتهية أو التي على وشك الانتهاء، لكل الموظفين.",
+    "restrictedProfessionsDescription": "الموظفون الذين تندرج مهنتهم ضمن قائمة المهن المقيدة.",
+    "missingDocumentsDescription": "الموظفون الذين ينقصهم مستند مطلوب واحد على الأقل.",
+    "complianceSummaryDescription": "درجة امتثال كل موظف وحالة السجل المكرر في مكان واحد."
+  },
+  "timeline": {
+    "audit": {
+      "create": "تم إنشاء السجل",
+      "update": "تم تحديث السجل",
+      "delete": "تم حذف السجل",
+      "upload": "تم رفع ملف",
+      "download": "تم تنزيل ملف",
+      "view": "تمت المعاينة",
+      "statusChange": "تغيرت الحالة",
+      "login": "تم تسجيل الدخول",
+      "logout": "تم تسجيل الخروج"
+    },
+    "document": {
+      "updated": "تم تحديث المستند"
+    },
+    "communication": {
+      "voiceRecording": "تمت إضافة تسجيل صوتي",
+      "meetingNote": "تمت إضافة ملاحظة اجتماع",
+      "internalNote": "تمت إضافة ملاحظة داخلية"
+    }
+  },
+  "dashboard": {
+    "complianceScore": "درجة الامتثال",
+    "complianceSnapshot": "لمحة الامتثال",
+    "restrictedProfessions": "المهن المقيدة",
+    "missingDocuments": "المستندات الناقصة",
+    "recentNotifications": "أحدث الإشعارات",
+    "noNotifications": "لا توجد إشعارات بعد.",
+    "noWidgets": "لا توجد عناصر مسجلة في لوحة التحكم.",
+    "quickActionAddEmployee": "+ إضافة موظف",
+    "quickActionViewCompliance": "عرض مركز الامتثال",
+    "quickActionViewReports": "عرض التقارير"
+  },
+  "systemHealth": {
+    "title": "صحة النظام",
+    "storage": "التخزين",
+    "records": "السجلات",
+    "activeUsers": "المستخدمون النشطون",
+    "backgroundJobs": "المهام الخلفية",
+    "syncStatus": "حالة المزامنة",
+    "errors": "الأخطاء",
+    "warnings": "التحذيرات",
+    "backupStatus": "حالة النسخ الاحتياطي",
+    "auditStatistics": "إحصائيات التدقيق",
+    "attachments": "المرفقات",
+    "blobs": "الملفات الثنائية",
+    "usage": "الاستخدام",
+    "notAvailable": "غير متاح",
+    "notificationEvaluation": "تقييم الإشعارات",
+    "workflowSlaCheck": "فحص اتفاقية مستوى الخدمة لسير العمل",
+    "mode": "الوضع",
+    "pendingOfflineWrites": "الكتابات غير المتصلة المعلقة",
+    "none": "لا يوجد",
+    "notScheduled": "لم تتم الجدولة بعد",
+    "syncModeLocalOnly": "محلي فقط",
+    "backupAvailable": "متاح",
+    "backupUnavailableReason": "النسخ الاحتياطي يتطلب الترحيل السحابي (راجع القسم 13 من مخطط التنفيذ)",
+    "recordLabels": {
+      "persons": "الأشخاص",
+      "companies": "الشركات",
+      "organizations": "المؤسسات",
+      "documents": "المستندات",
+      "communicationEntries": "سجلات التواصل",
+      "masterDataRecords": "سجلات البيانات الأساسية"
+    }
+  }
+}

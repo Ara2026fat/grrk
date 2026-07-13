@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global baseline only — every visual decision beyond this belongs in the
+   design-system tokens/primitives, never in ad hoc page-level CSS. */
+html, body, #root {
+  height: 100%;
+}
+body {
+  font-family: theme('fontFamily.sans');
+  background-color: theme('colors.surface.subtle');
+  color: theme('colors.text.primary');
+}

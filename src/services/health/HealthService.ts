@@ -1,4 +1,3 @@
-import { supabase } from "@/services/data/supabaseClient";
 import {
   personRepository,
   companyRepository,

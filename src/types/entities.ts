@@ -140,3 +140,45 @@ export interface User {
   roleId: string;
   preferredLanguage: "ar" | "en";
 }
+/** Notification Engine records (Section 8 / Blueprint 17.5). */
+export type NotificationCategory =
+  | "expired"
+  | "expiringSoon30"
+  | "expiringSoon60"
+  | "expiringSoon90"
+  | "restrictedProfession"
+  | "missingDocument"
+  | "duplicateRecord"
+  | "system";
+
+export interface NotificationRecord extends BaseRecord {
+  category: NotificationCategory;
+  entityType: string;
+  entityId: string;
+  message?: string;
+  read: boolean;
+}
+
+/** Communication Platform pivot entities — Contact/Conversation/Message. */
+export interface Contact extends BaseRecord {
+  category: string;
+  fullNameAr: string;
+  fullNameEn: string;
+  mobileNumber?: string;
+  notes?: string;
+}
+
+export interface Conversation extends BaseRecord {
+  contactId: string;
+  lastMessageAt?: string;
+}
+
+export type MessageContentType = "text" | "voice" | "image" | "file";
+
+export interface Message extends BaseRecord {
+  conversationId: string;
+  contactId: string;
+  contentType: MessageContentType;
+  text?: string;
+  attachmentId?: string;
+}

@@ -1,93 +1,99 @@
-import { db } from "../db";
+import { supabase } from "../supabaseClient";
 import { auditEngine } from "@/services/audit/AuditEngine";
-import { currentUser } from "@/services/auth/authContext";
+import { isAuthenticated } from "@/services/auth/authContext";
 import type { Attachment, AuditAction } from "@/types/entities";
 
-/**
- * Binary attachments (documents, images, PDFs, voice recordings) need a
- * dedicated repository because the Blob payload is stored separately from
- * its metadata record (Standard 17.6) — this keeps `attachments.list()`
- * queries fast, since they never have to load blob bytes. Still
- * Repository-First (17.1): this is the ONLY place that touches
- * `db.attachments` / `db.attachmentBlobs` directly.
- */
+const BUCKET = "attachments";
+
+function assertAuthenticated(): void {
+  if (!isAuthenticated()) {
+    throw new Error("Unauthorized: no authenticated user for attachment write");
+  }
+}
+
 export interface AttachmentUploadInput {
   id: string;
+  entityType: string;
+  entityId: string;
   fileName: string;
   mimeType: string;
-  sizeBytes: number;
+  fileSize: number;
+  uploadedBy?: string;
 }
 
 export const attachmentRepository = {
   async upload(input: AttachmentUploadInput, blob: Blob): Promise<Attachment> {
-    const now = new Date().toISOString();
+    assertAuthenticated();
     const blobKey = `${input.id}:${input.fileName}`;
-    await db.attachmentBlobs.put({ blobKey, blob });
+
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(blobKey, blob, {
+      contentType: input.mimeType,
+      upsert: true,
+    });
+    if (uploadError) throw uploadError;
 
     const record: Attachment = {
       ...input,
       blobKey,
+      uploadedAt: new Date().toISOString(),
       isActive: true,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: currentUser()?.id,
     };
-    await db.attachments.add(record);
+
+    const { data, error } = await supabase.from("attachments").insert(record).select().single();
+    if (error) throw error;
     await auditEngine.record({ entityType: "attachment", entityId: record.id, action: "upload" });
-    return record;
+    return data as Attachment;
   },
 
-  /**
-   * Replace an attachment's file content WITHOUT losing the old version
-   * (version-history readiness — see the `replacesAttachmentId` doc
-   * comment on the `Attachment` type). This never mutates the existing
-   * blob or record in place:
-   *   1. A brand-new Attachment is uploaded (new id, new blob), tagged
-   *      with `replacesAttachmentId` pointing at the one being replaced.
-   *   2. The old Attachment is soft-archived (`isActive: false`) — kept,
-   *      not deleted, and its own audit trail is preserved untouched.
-   * Callers (e.g. DocumentPanel's `attachmentIds`) are responsible for
-   * swapping the old id for the new one wherever the attachment is
-   * referenced — this repository only knows about attachments, never
-   * about which document/entity holds the reference (Repository-First:
-   * no upward knowledge of callers).
-   */
+  /** Replaces an attachment: a brand-new Attachment is uploaded (new id,
+   *  new Storage object) tagged with replacesAttachmentId; the old one is
+   *  soft-archived (isActive: false), never deleted. */
   async replace(existingId: string, input: Omit<AttachmentUploadInput, "id">, blob: Blob): Promise<Attachment> {
-    const existing = await db.attachments.get(existingId);
+    assertAuthenticated();
+    const existing = await this.getMetadata(existingId);
     if (!existing) throw new Error(`Attachment not found: ${existingId}`);
 
     const replacement = await this.upload({ id: crypto.randomUUID(), ...input }, blob);
-    const withLineage: Attachment = { ...replacement, replacesAttachmentId: existingId };
-    await db.attachments.put(withLineage);
-
     const now = new Date().toISOString();
-    await db.attachments.update(existingId, { isActive: false, updatedAt: now });
+
+    const { data, error } = await supabase
+      .from("attachments")
+      .update({ replacesAttachmentId: existingId })
+      .eq("id", replacement.id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    await supabase.from("attachments").update({ isActive: false, updatedAt: now }).eq("id", existingId);
     await auditEngine.record({ entityType: "attachment", entityId: existingId, action: "update" });
 
-    return withLineage;
+    return data as Attachment;
   },
 
   async getBlob(blobKey: string): Promise<Blob | undefined> {
-    const row = await db.attachmentBlobs.get(blobKey);
-    return row?.blob;
+    const { data, error } = await supabase.storage.from(BUCKET).download(blobKey);
+    if (error) return undefined;
+    return data;
   },
 
   async getMetadata(id: string): Promise<Attachment | undefined> {
-    return db.attachments.get(id);
+    const { data, error } = await supabase.from("attachments").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as Attachment | null) ?? undefined;
   },
 
-  /** Preview ("view") and explicit Download are recorded as distinct
-   *  audit actions — Timeline/Audit Log integration for the Preview
-   *  experience. Both read the SAME blob; only the audit trail differs. */
+  /** Preview and explicit Download are recorded as distinct audit actions —
+   *  both read the same blob; only the audit trail differs. */
   async recordAccess(id: string, action: Extract<AuditAction, "view" | "download">): Promise<void> {
     await auditEngine.record({ entityType: "attachment", entityId: id, action });
   },
 
   async remove(id: string): Promise<void> {
-    const meta = await db.attachments.get(id);
+    assertAuthenticated();
+    const meta = await this.getMetadata(id);
     if (meta) {
-      await db.attachmentBlobs.delete(meta.blobKey);
-      await db.attachments.delete(id);
+      await supabase.storage.from(BUCKET).remove([meta.blobKey]);
+      await supabase.from("attachments").delete().eq("id", id);
       await auditEngine.record({ entityType: "attachment", entityId: id, action: "delete" });
     }
   },

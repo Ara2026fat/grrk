@@ -46,7 +46,7 @@ export class BaseSupabaseRepository<T extends { id: string }> implements IReposi
 
   async create(record: T): Promise<T> {
     this.assertAuthenticated();
-    const { data, error } = await supabase.from(this.tableName).insert(record).select().single();
+    const { data, error } = await supabase.from(this.tableName).insert(record as never).select().single();
     if (error) throw error;
     await auditEngine.record({ entityType: this.entityType, entityId: record.id, action: "create" });
     return data as T;
@@ -55,7 +55,12 @@ export class BaseSupabaseRepository<T extends { id: string }> implements IReposi
   async update(id: string, partial: Partial<T>): Promise<T> {
     this.assertAuthenticated();
     const existing = await this.getById(id);
-    const { data, error } = await supabase.from(this.tableName).update(partial).eq("id", id).select().single();
+    const { data, error } = await supabase
+      .from(this.tableName)
+      .update(partial as never)
+      .eq("id", id)
+      .select()
+      .single();
     if (error) throw error;
     await auditEngine.record({
       entityType: this.entityType,

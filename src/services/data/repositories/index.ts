@@ -1,5 +1,3 @@
-import { db } from "../db";
-import { BaseIndexedDbRepository } from "../BaseIndexedDbRepository";
 import type {
   Person,
   Company,
@@ -7,28 +5,23 @@ import type {
   DocumentRecord,
   CommunicationEntry,
   MasterDataRecord,
+  NotificationRecord,
+  Contact,
+  Conversation,
+  Message,
 } from "@/types/entities";
-import type { NotificationRecord } from "@/services/notifications/NotificationEngine";
+import { BaseSupabaseRepository } from "../BaseSupabaseRepository";
 
-/**
- * Concrete repository instances, wired to the IndexedDB adapter.
- *
- * This is the ONE file that instantiates `BaseIndexedDbRepository` against
- * Dexie tables. When Stage 6 (Cloud Migration) begins, a parallel
- * `repositories.supabase.ts` implementing the same `IRepository<T>`
- * contracts is added here and the binding below is swapped — nothing
- * elsewhere in the app changes (Blueprint Section 13 / Standard 17.1).
- */
-export const personRepository = new BaseIndexedDbRepository<Person>(db.persons, "person");
-export const companyRepository = new BaseIndexedDbRepository<Company>(db.companies, "company");
-export const organizationRepository = new BaseIndexedDbRepository<Organization>(db.organizations, "organization");
-export const documentRepository = new BaseIndexedDbRepository<DocumentRecord>(db.documents, "document");
-export const communicationRepository = new BaseIndexedDbRepository<CommunicationEntry>(
-  db.communicationEntries,
+export const personRepository = new BaseSupabaseRepository<Person>("persons", "person");
+export const companyRepository = new BaseSupabaseRepository<Company>("companies", "company");
+export const organizationRepository = new BaseSupabaseRepository<Organization>("organizations", "organization");
+export const documentRepository = new BaseSupabaseRepository<DocumentRecord>("documents", "document");
+export const communicationRepository = new BaseSupabaseRepository<CommunicationEntry>(
+  "communicationEntries",
   "communicationEntry"
 );
-export const masterDataRepository = new BaseIndexedDbRepository<MasterDataRecord>(db.masterData, "masterData");
-export const notificationRepository = new BaseIndexedDbRepository<NotificationRecord>(
-  db.notifications,
-  "notification"
-);
+export const masterDataRepository = new BaseSupabaseRepository<MasterDataRecord>("masterData", "masterData");
+export const notificationRepository = new BaseSupabaseRepository<NotificationRecord>("notifications", "notification");
+export const contactRepository = new BaseSupabaseRepository<Contact>("contacts", "contact");
+export const conversationRepository = new BaseSupabaseRepository<Conversation>("conversations", "conversation");
+export const messageRepository = new BaseSupabaseRepository<Message>("messages", "message");

@@ -1,83 +1,89 @@
 import { supabase } from "@/services/data/supabaseClient";
-import {
-  personRepository,
-  companyRepository,
-  organizationRepository,
-  documentRepository,
-  communicationRepository,
-  masterDataRepository,
-} from "@/services/data/repositories";
 import { auditEngine } from "@/services/audit/AuditEngine";
-import { loggingService } from "@/services/logging/LoggingService";
+import type { WorkflowDefinition, WorkflowInstance, WorkflowInstanceStatus } from "./workflow.types";
 
 /**
- * System Health Center foundation (Blueprint Standard 17.11).
- * Cloud Migration (Section 13): storage metrics now come from Supabase
- * Storage (attachment row count) instead of navigator.storage.estimate()
- * — that browser API only ever measured local IndexedDB usage, which is
- * no longer where the data lives. Record counts and audit statistics
- * are unchanged in shape, just sourced from Supabase-backed repositories.
+ * Workflow Engine foundation (Blueprint 17.9). Cloud Migration
+ * (Section 13): definitions/instances now persist via Supabase.
  */
-export interface StorageMetrics {
-  attachmentCount: number;
-}
-
-export interface RecordMetrics {
-  persons: number;
-  companies: number;
-  organizations: number;
-  documents: number;
-  communicationEntries: number;
-  masterDataRecords: number;
-}
-
-class HealthService {
-  async getStorageMetrics(): Promise<StorageMetrics> {
-    const { count, error } = await supabase.from("attachments").select("*", { count: "exact", head: true });
+class WorkflowEngine {
+  async registerDefinition(definition: WorkflowDefinition): Promise<void> {
+    const { error } = await supabase.from("workflowDefinitions").upsert(definition);
     if (error) throw error;
-    return { attachmentCount: count ?? 0 };
   }
 
-  async getRecordMetrics(): Promise<RecordMetrics> {
-    const [persons, companies, organizations, documents, communicationEntries, masterDataRecords] =
-      await Promise.all([
-        personRepository.count(),
-        companyRepository.count(),
-        organizationRepository.count(),
-        documentRepository.count(),
-        communicationRepository.count(),
-        masterDataRepository.count(),
-      ]);
-    return { persons, companies, organizations, documents, communicationEntries, masterDataRecords };
+  async startInstance(definitionId: string, entityType: string, entityId: string): Promise<WorkflowInstance> {
+    const { data: definition, error: defError } = await supabase
+      .from("workflowDefinitions")
+      .select("*")
+      .eq("id", definitionId)
+      .maybeSingle();
+    if (defError) throw defError;
+    if (!definition) throw new Error(`Unknown workflow definition: ${definitionId}`);
+
+    const firstStep = (definition as WorkflowDefinition).steps[0];
+    if (!firstStep) throw new Error(`Workflow definition ${definitionId} has no steps`);
+
+    const instance: WorkflowInstance = {
+      id: crypto.randomUUID(),
+      workflowDefinitionId: definitionId,
+      entityType,
+      entityId,
+      currentStepId: firstStep.stepId,
+      status: "pending",
+      history: [{ stepId: firstStep.stepId, status: "pending", actedAt: new Date().toISOString() }],
+      startedAt: new Date().toISOString(),
+      dueAt: firstStep.slaHours
+        ? new Date(Date.now() + firstStep.slaHours * 3_600_000).toISOString()
+        : undefined,
+    };
+
+    const { error } = await supabase.from("workflowInstances").insert(instance);
+    if (error) throw error;
+    await auditEngine.record({ entityType: "workflowInstance", entityId: instance.id, action: "create" });
+    return instance;
   }
 
-  async getAuditStatistics() {
-    return auditEngine.countByAction();
-  }
+  async advance(
+    instanceId: string,
+    status: WorkflowInstanceStatus,
+    actedBy?: string,
+    comment?: string
+  ): Promise<WorkflowInstance> {
+    const { data: instance, error: instError } = await supabase
+      .from("workflowInstances")
+      .select("*")
+      .eq("id", instanceId)
+      .maybeSingle();
+    if (instError) throw instError;
+    if (!instance) throw new Error(`Unknown workflow instance: ${instanceId}`);
 
-  getRecentErrors(limit = 20) {
-    return loggingService.getRecent("error", limit);
-  }
+    const { data: definition, error: defError } = await supabase
+      .from("workflowDefinitions")
+      .select("*")
+      .eq("id", (instance as WorkflowInstance).workflowDefinitionId)
+      .maybeSingle();
+    if (defError) throw defError;
 
-  getRecentWarnings(limit = 20) {
-    return loggingService.getRecent("warning", limit);
-  }
+    const steps = (definition as WorkflowDefinition | null)?.steps;
+    const currentIndex = steps?.findIndex((s) => s.stepId === (instance as WorkflowInstance).currentStepId) ?? -1;
+    const nextStep = steps?.[currentIndex + 1];
 
-  /** Placeholders — real values arrive once the Notification/Workflow
-   *  scheduled jobs (Stage 3/Stage 6) exist. Reserved here so the Health
-   *  Center UI has a stable shape. Returns i18n KEYS, not literal English
-   *  text — the UI is what translates them (never hardcode interface text). */
-  getBackgroundJobStatus() {
-    return { notificationEvaluation: "systemHealth.notScheduled", workflowSlaCheck: "systemHealth.notScheduled" };
-  }
+    const updated: WorkflowInstance = {
+      ...(instance as WorkflowInstance),
+      status: nextStep ? "inProgress" : status,
+      currentStepId: nextStep ? nextStep.stepId : (instance as WorkflowInstance).currentStepId,
+      history: [
+        ...(instance as WorkflowInstance).history,
+        { stepId: (instance as WorkflowInstance).currentStepId, status, actedBy, actedAt: new Date().toISOString(), comment },
+      ],
+    };
 
-  getSyncStatus() {
-    return { modeKey: "systemHealth.syncModeCloud", pendingOfflineWrites: 0 };
-  }
-
-  getBackupStatus() {
-    return { available: false as const, reasonKey: "systemHealth.backupUnavailableReason" };
+    const { error } = await supabase.from("workflowInstances").update(updated).eq("id", instanceId);
+    if (error) throw error;
+    await auditEngine.record({ entityType: "workflowInstance", entityId: instance.id, action: "statusChange" });
+    return updated;
   }
 }
 
-export const healthService = new HealthService();
+export const workflowEngine = new WorkflowEngine();

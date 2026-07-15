@@ -137,3 +137,5 @@ Implementation Blueprint section that justifies its shape. Before changing
 a file's structure, re-read that citation — Sections 17.1–17.11 of the
 Blueprint are binding standards, not suggestions (see the Blueprint's
 Governance Note).
+
+<!-- trigger rebuild after updating Supabase secrets -->

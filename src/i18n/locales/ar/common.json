@@ -45,7 +45,7 @@
     "invalidEmail": "أدخل بريداً إلكترونياً صحيحاً"
   },
   "common": {
-    "loading": "جارٍ التحميل…",
+    "loading": "...جار التحميل",
     "close": "إغلاق",
     "switchLanguage": "تبديل اللغة",
     "emptyList": "لا توجد سجلات بعد.",
@@ -94,7 +94,7 @@
     "noAttachments": "لا توجد ملفات مرفقة بعد.",
     "uploadFile": "رفع ملف",
     "attachmentUploaded": "تم رفع الملف بنجاح.",
-    "attachmentUploadFailed": "حدث خطأ أثناء الرفع. يرجى المحاولة مرة أخرى.",
+    "attachmentUploadFailed": "حدث خطأ أثناء رفع الملف. يرجى المحاولة مرة أخرى.",
     "attachmentReplaced": "تم استبدال الملف بنجاح.",
     "attachmentReplaceFailed": "حدث خطأ أثناء استبدال الملف. يرجى المحاولة مرة أخرى.",
     "fileSize": "حجم الملف",
@@ -158,10 +158,10 @@
     "exportFailed": "حدث خطأ أثناء إنشاء هذا التقرير. يرجى المحاولة مرة أخرى.",
     "groupEmployee": "تقارير الموظفين",
     "groupCompliance": "تقارير الامتثال",
-    "employeeDirectoryDescription": "جميع الموظفين النشطين مع مهنتهم وبيانات التواصل الخاصة بهم.",
+    "employeeDirectoryDescription": "جميع الموظفين النشطين مع بيانات التواصل الخاصة بهم.",
     "documentExpiryDescription": "جميع المستندات المنتهية أو التي على وشك الانتهاء، لكل الموظفين.",
     "restrictedProfessionsDescription": "الموظفون الذين تندرج مهنتهم ضمن قائمة المهن المقيدة.",
-    "missingDocumentsDescription": "الموظفون الذين ينقصهم مستند مطلوب واحد على الأقل.",
+    "missingDocumentsDescription": "الموظفون الذين ينقصهم مستند واحد مطلوب على الأقل.",
     "complianceSummaryDescription": "درجة امتثال كل موظف وحالة السجل المكرر في مكان واحد."
   },
   "timeline": {
@@ -219,8 +219,9 @@
     "none": "لا يوجد",
     "notScheduled": "لم تتم الجدولة بعد",
     "syncModeLocalOnly": "محلي فقط",
+    "syncModeCloud": "سحابي (Supabase)",
     "backupAvailable": "متاح",
-    "backupUnavailableReason": "النسخ الاحتياطي يتطلب الترحيل السحابي (راجع القسم 13 من مخطط التنفيذ)",
+    "backupUnavailableReason": "حالة النسخ الاحتياطي تعتمد على خطة وإعدادات مشروع Supabase الخاص بك — يُرجى مراجعة لوحة تحكم Supabase مباشرة.",
     "recordLabels": {
       "persons": "الأشخاص",
       "companies": "الشركات",

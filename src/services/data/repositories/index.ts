@@ -5,11 +5,11 @@ import type {
   DocumentRecord,
   CommunicationEntry,
   MasterDataRecord,
-  NotificationRecord,
   Contact,
   Conversation,
   Message,
 } from "@/types/entities";
+import type { NotificationRecord } from "@/services/notifications/NotificationEngine";
 import { BaseSupabaseRepository } from "../BaseSupabaseRepository";
 
 export const personRepository = new BaseSupabaseRepository<Person>("persons", "person");

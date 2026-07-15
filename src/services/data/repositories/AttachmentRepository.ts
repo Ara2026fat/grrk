@@ -13,12 +13,10 @@ function assertAuthenticated(): void {
 
 export interface AttachmentUploadInput {
   id: string;
-  entityType: string;
-  entityId: string;
   fileName: string;
   mimeType: string;
-  fileSize: number;
-  uploadedBy?: string;
+  sizeBytes: number;
+  createdBy?: string;
 }
 
 export const attachmentRepository = {
@@ -32,10 +30,16 @@ export const attachmentRepository = {
     });
     if (uploadError) throw uploadError;
 
+    const now = new Date().toISOString();
     const record: Attachment = {
-      ...input,
+      id: input.id,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
       blobKey,
-      uploadedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+      createdBy: input.createdBy,
       isActive: true,
     };
 
@@ -45,9 +49,6 @@ export const attachmentRepository = {
     return data as Attachment;
   },
 
-  /** Replaces an attachment: a brand-new Attachment is uploaded (new id,
-   *  new Storage object) tagged with replacesAttachmentId; the old one is
-   *  soft-archived (isActive: false), never deleted. */
   async replace(existingId: string, input: Omit<AttachmentUploadInput, "id">, blob: Blob): Promise<Attachment> {
     assertAuthenticated();
     const existing = await this.getMetadata(existingId);
@@ -82,8 +83,6 @@ export const attachmentRepository = {
     return (data as Attachment | null) ?? undefined;
   },
 
-  /** Preview and explicit Download are recorded as distinct audit actions —
-   *  both read the same blob; only the audit trail differs. */
   async recordAccess(id: string, action: Extract<AuditAction, "view" | "download">): Promise<void> {
     await auditEngine.record({ entityType: "attachment", entityId: id, action });
   },

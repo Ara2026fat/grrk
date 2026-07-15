@@ -14,18 +14,11 @@ import { registerDefaultReports } from "@/modules/reports/reportDefinitions";
 import { seedMasterDataIfEmpty } from "./data/seed";
 
 /**
- * Composition root. This is the ONE file that wires concrete
- * implementations into the engines' registries. It exists so that:
- *   - swapping an AI mock for a real service (17.8) only touches its
- *     binding file (e.g. services/search/intelligentSearchBinding.ts) plus,
- *     if adding a new one, one line here;
- *   - swapping the local repository adapters for Supabase adapters
- *     (Section 13) is a matter of changing services/data/repositories/index.ts,
- *     which every consumer already imports from — no changes needed here.
- *
- * `bootstrapServices()` must run once, before the app renders (see
- * main.tsx). Stage 1 makes it async: Master Data seeding (services/data/seed.ts)
- * needs to complete before any component reads it.
+ * Composition root. See original header comment in git history for full
+ * rationale. `seedMasterDataIfEmpty()` is wrapped in try/catch so that a
+ * Master Data seeding failure never blocks the entire app from loading —
+ * it is logged instead, and the app boots with an empty Master Data set
+ * that an administrator can populate via the Configuration Center.
  */
 export async function bootstrapServices(): Promise<void> {
   notificationEngine.registerSender(new InAppNotificationSender());
@@ -38,9 +31,13 @@ export async function bootstrapServices(): Promise<void> {
   reportingEngine.registerExporter(new PdfExporter());
   reportingEngine.registerExporter(new ExcelExporter());
   reportingEngine.registerExporter(new PrintExporter());
-  registerDefaultReports();
 
+  registerDefaultReports();
   registerDefaultWidgets();
 
-  await seedMasterDataIfEmpty();
+  try {
+    await seedMasterDataIfEmpty();
+  } catch (err) {
+    console.error("Master data seeding failed (non-fatal, app will continue loading):", err);
+  }
 }

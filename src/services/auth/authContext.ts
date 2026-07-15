@@ -28,4 +28,14 @@ export function isAuthenticated(): boolean {
  * Resolves a stored `createdBy`/attribution user id to a display name, or
  * `undefined` if it can't be resolved (the caller decides the fallback
  * copy — this service has no i18n opinions). Stage 0/1/2 only ever have
- * ONE stubbed user, so thi
+ * ONE stubbed user, so this can only recognize that user or return the
+ * raw id — a full user directory is Roadmap Phase 8 (System
+ * Administration). Centralized here so every "who did this" label
+ * resolves the same way, and wiring in a real user directory later is a
+ * one-function change.
+ */
+export function resolveUserDisplayName(userId: string | undefined): string | undefined {
+  if (!userId) return undefined;
+  if (userId === activeUser?.id) return activeUser.displayName;
+  return userId;
+}

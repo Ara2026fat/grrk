@@ -1,76 +1,83 @@
-import { db } from "@/services/data/db";
+import { supabase } from "@/services/data/supabaseClient";
+import {
+  personRepository,
+  companyRepository,
+  organizationRepository,
+  documentRepository,
+  communicationRepository,
+  masterDataRepository,
+} from "@/services/data/repositories";
 import { auditEngine } from "@/services/audit/AuditEngine";
-import type { WorkflowDefinition, WorkflowInstance, WorkflowInstanceStatus } from "./workflow.types";
+import { loggingService } from "@/services/logging/LoggingService";
 
 /**
- * Workflow Engine foundation (Blueprint 17.9). Stage 0 provides:
- *   - persistence for definitions/instances (via the same repository/IndexedDB
- *     layer as everything else — 17.1)
- *   - instance lifecycle primitives (start, advance, escalate)
- *   - automatic Audit Log + Timeline visibility on every transition
- *
- * NOT included in Stage 0 (deferred to the Compliance/Workflow business
- * stage): the actual triggers that start a workflow from a Compliance or
- * Notification event, SLA-breach scheduling, and the visual designer.
- * Those consume this engine — they do not require changes to it.
+ * System Health Center foundation (Blueprint Standard 17.11).
+ * Cloud Migration (Section 13): storage metrics now come from Supabase
+ * Storage (attachment row count) instead of navigator.storage.estimate()
+ * — that browser API only ever measured local IndexedDB usage, which is
+ * no longer where the data lives. Record counts and audit statistics
+ * are unchanged in shape, just sourced from Supabase-backed repositories.
  */
-class WorkflowEngine {
-  async registerDefinition(definition: WorkflowDefinition): Promise<void> {
-    await db.workflowDefinitions.put(definition);
+export interface StorageMetrics {
+  attachmentCount: number;
+}
+
+export interface RecordMetrics {
+  persons: number;
+  companies: number;
+  organizations: number;
+  documents: number;
+  communicationEntries: number;
+  masterDataRecords: number;
+}
+
+class HealthService {
+  async getStorageMetrics(): Promise<StorageMetrics> {
+    const { count, error } = await supabase.from("attachments").select("*", { count: "exact", head: true });
+    if (error) throw error;
+    return { attachmentCount: count ?? 0 };
   }
 
-  async startInstance(definitionId: string, entityType: string, entityId: string): Promise<WorkflowInstance> {
-    const definition = await db.workflowDefinitions.get(definitionId);
-    if (!definition) throw new Error(`Unknown workflow definition: ${definitionId}`);
-    const firstStep = definition.steps[0];
-    if (!firstStep) throw new Error(`Workflow definition ${definitionId} has no steps`);
-
-    const instance: WorkflowInstance = {
-      id: crypto.randomUUID(),
-      workflowDefinitionId: definitionId,
-      entityType,
-      entityId,
-      currentStepId: firstStep.stepId,
-      status: "pending",
-      history: [{ stepId: firstStep.stepId, status: "pending", actedAt: new Date().toISOString() }],
-      startedAt: new Date().toISOString(),
-      dueAt: firstStep.slaHours
-        ? new Date(Date.now() + firstStep.slaHours * 3600_000).toISOString()
-        : undefined,
-    };
-    await db.workflowInstances.add(instance);
-    await auditEngine.record({ entityType: "workflowInstance", entityId: instance.id, action: "create" });
-    return instance;
+  async getRecordMetrics(): Promise<RecordMetrics> {
+    const [persons, companies, organizations, documents, communicationEntries, masterDataRecords] =
+      await Promise.all([
+        personRepository.count(),
+        companyRepository.count(),
+        organizationRepository.count(),
+        documentRepository.count(),
+        communicationRepository.count(),
+        masterDataRepository.count(),
+      ]);
+    return { persons, companies, organizations, documents, communicationEntries, masterDataRecords };
   }
 
-  async advance(
-    instanceId: string,
-    status: WorkflowInstanceStatus,
-    actedBy?: string,
-    comment?: string
-  ): Promise<WorkflowInstance> {
-    const instance = await db.workflowInstances.get(instanceId);
-    if (!instance) throw new Error(`Unknown workflow instance: ${instanceId}`);
+  async getAuditStatistics() {
+    return auditEngine.countByAction();
+  }
 
-    const definition = await db.workflowDefinitions.get(instance.workflowDefinitionId);
-    const currentIndex = definition?.steps.findIndex((s) => s.stepId === instance.currentStepId) ?? -1;
-    const nextStep = definition?.steps[currentIndex + 1];
+  getRecentErrors(limit = 20) {
+    return loggingService.getRecent("error", limit);
+  }
 
-    const updated: WorkflowInstance = {
-      ...instance,
-      status: nextStep ? "inProgress" : status,
-      currentStepId: nextStep ? nextStep.stepId : instance.currentStepId,
-      history: [
-        ...instance.history,
-        { stepId: instance.currentStepId, status, actedBy, actedAt: new Date().toISOString(), comment },
-      ],
-    };
-    await db.workflowInstances.put(updated);
-    await auditEngine.record({ entityType: "workflowInstance", entityId: instance.id, action: "statusChange" });
-    // Reminders/escalations are emitted as Notification Engine entries, not
-    // a parallel notification system (Blueprint 17.9) — wired in Stage 3/4.
-    return updated;
+  getRecentWarnings(limit = 20) {
+    return loggingService.getRecent("warning", limit);
+  }
+
+  /** Placeholders — real values arrive once the Notification/Workflow
+   *  scheduled jobs (Stage 3/Stage 6) exist. Reserved here so the Health
+   *  Center UI has a stable shape. Returns i18n KEYS, not literal English
+   *  text — the UI is what translates them (never hardcode interface text). */
+  getBackgroundJobStatus() {
+    return { notificationEvaluation: "systemHealth.notScheduled", workflowSlaCheck: "systemHealth.notScheduled" };
+  }
+
+  getSyncStatus() {
+    return { modeKey: "systemHealth.syncModeCloud", pendingOfflineWrites: 0 };
+  }
+
+  getBackupStatus() {
+    return { available: false as const, reasonKey: "systemHealth.backupUnavailableReason" };
   }
 }
 
-export const workflowEngine = new WorkflowEngine();
+export const healthService = new HealthService();

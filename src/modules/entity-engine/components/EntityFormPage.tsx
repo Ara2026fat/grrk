@@ -11,82 +11,46 @@ import type { BaseRecord } from "@/types/entities";
 
 interface EntityFormPageProps<T extends BaseRecord> {
   schema: EntitySchema<T>;
-  initialValues?: Partial<T>;
-  onSaved: (record: T) => void;
-  onCancel: () => void;
-}
-
-type FocusableEl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-
-/** Groups fields by their optional `section`, preserving first-seen order —
- *  fields without a section come first as an implicit unlabeled group. */
-function groupFieldsBySection<T>(fields: EntityFieldDefinition<T>[]) {
-  const order: (string | undefined)[] = [];
-  const groups = new Map<string | undefined, EntityFieldDefinition<T>[]>();
-  for (const field of fields) {
-    if (!groups.has(field.section)) {
-      groups.set(field.section, []);
-      order.push(field.section);
+  initialValues?: Partial<T>;async function onSubmit(values: T) {
+    if (schema.asyncValidators?.length) {
+      const errorKeys = await runAsyncValidators(values, schema.asyncValidators, { currentId: initialValues?.id });
+      if (errorKeys.length > 0) {
+        errorKeys.forEach((key) => setError("root", { message: key }));
+        return;
+      }
     }
-    groups.get(field.section)!.push(field);
-  }
-  return order.map((section) => ({ section, fields: groups.get(section)! }));
-}
 
-/**
- * ONE generic create/edit form, driven entirely by `schema.fields` and
- * `schema.zodSchema` (Universal Entity Engine — 17.3). Adding a new field
- * to an entity is a config change here, never a new form component.
- *
- * UX polish pass: sectioned 2-column responsive layout, autofocus on the
- * first field, save/error feedback via toast, and Escape-to-cancel —
- * applied here (not per-module) so every current and future entity form
- * gets it for free.
- */
-export function EntityFormPage<T extends BaseRecord>({
-  schema,
-  initialValues,
-  onSaved,
-  onCancel,
-}: EntityFormPageProps<T>) {
-  const { t, i18n } = useTranslation();
-  const { getByCategory } = useMasterData();
-  const { showToast } = useToast();
-  const lang = (i18n.resolvedLanguage ?? "ar") as "ar" | "en";
-  const firstFieldRef = useRef<FocusableEl | null>(null);
-  const isEditing = Boolean(initialValues?.id);
-  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+    try {
+      if (initialValues?.id) {
+        const saved = await schema.repository.update(initialValues.id, values);
+        showToast("success", t("messages.saved"));
+        onSaved(saved);
+        return;
+      }
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors, isSubmitting, isDirty },
-  } = useForm<T>({
-    resolver: zodResolver(schema.zodSchema),
-    defaultValues: initialValues as never,
-  });
-
-  /** Cancel/Escape only interrupt with a confirmation when there's
-   *  something that would actually be lost — an untouched form just closes
-   *  immediately, which is what people expect from a "Cancel" button. */
-  function requestCancel() {
-    if (isDirty) {
-      setConfirmingDiscard(true);
-    } else {
-      onCancel();
+      const now = new Date().toISOString();
+      const newRecord = {
+        ...schema.newRecordDefaults,
+        ...values,
+        id: crypto.randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+        isActive: true,
+      } as T;
+      const saved = await schema.repository.create(newRecord);
+      showToast("success", t("messages.created"));
+      onSaved(saved);
+    } catch {
+      showToast("error", t("messages.saveFailed"));
     }
   }
 
-  // Faster data entry: land the cursor in the first field immediately
-  // instead of requiring a click before typing can start.
-  useEffect(() => {
-    firstFieldRef.current?.focus();
-  }, []);
+  const sections = useMemo(() => groupFieldsBySection(schema.fields), [schema.fields]);
+  let renderedFirstFieldYet = false;
 
-  // Keyboard: Escape cancels (through the same unsaved-changes guard as the
-  // Cancel button), matching the Dialog primitive's convention elsewhere in
-  // the platform — one consistent "get me out of here" key.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !confirmingDiscard) requestCance
+  /** Combines react-hook-form's ref with our own "focus this on mount"
+   *  ref for exactly the first field across all sections. */
+  function combinedRef(rhfRef: (el: FocusableEl | null) => void, isFirst: boolean) {
+    return (el: FocusableEl | null) => {
+      rhfRef(el);
+      if (isFirst) firstFieldRef.

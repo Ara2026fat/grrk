@@ -87,6 +87,15 @@ export const attachmentRepository = {
     await auditEngine.record({ entityType: "attachment", entityId: id, action });
   },
 
+  async count(): Promise<number> {
+    const { count, error } = await supabase
+      .from("attachments")
+      .select("*", { count: "exact", head: true })
+      .eq("isActive", true);
+    if (error) throw error;
+    return count ?? 0;
+  },
+
   async remove(id: string): Promise<void> {
     assertAuthenticated();
     const meta = await this.getMetadata(id);

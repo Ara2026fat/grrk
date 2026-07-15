@@ -1,127 +1,83 @@
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { WidgetContainer } from "@/shared/components/WidgetContainer";
-import { healthService, RecordMetrics, StorageMetrics } from "@/services/health/HealthService";
+import { supabase } from "@/services/data/supabaseClient";
+import {
+  personRepository,
+  companyRepository,
+  organizationRepository,
+  documentRepository,
+  communicationRepository,
+  masterDataRepository,
+} from "@/services/data/repositories";
+import { auditEngine } from "@/services/audit/AuditEngine";
+import { loggingService } from "@/services/logging/LoggingService";
 
 /**
  * System Health Center foundation (Blueprint Standard 17.11).
- * Built as a set of widgets, reusing the same WidgetContainer as the
- * Executive Dashboard (17.7) — "monitoring" and "executive reporting" share
- * one visual/technical pattern by design.
+ * Cloud Migration (Section 13): storage metrics now come from Supabase
+ * Storage (attachment row count) instead of navigator.storage.estimate()
+ * — that browser API only ever measured local IndexedDB usage, which is
+ * no longer where the data lives. Record counts and audit statistics
+ * are unchanged in shape, just sourced from Supabase-backed repositories.
  */
-export function HealthCenterShell() {
-  const { t } = useTranslation();
-  const [storage, setStorage] = useState<StorageMetrics>();
-  const [records, setRecords] = useState<RecordMetrics>();
-  const [auditStats, setAuditStats] = useState<Record<string, number>>();
-
-  useEffect(() => {
-    healthService.getStorageMetrics().then(setStorage);
-    healthService.getRecordMetrics().then(setRecords);
-    healthService.getAuditStatistics().then(setAuditStats as never);
-  }, []);
-
-  const jobs = healthService.getBackgroundJobStatus();
-  const sync = healthService.getSyncStatus();
-  const backup = healthService.getBackupStatus();
-  const errors = healthService.getRecentErrors(5);
-  const warnings = healthService.getRecentWarnings(5);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-pageTitle font-bold text-text-primary">{t("systemHealth.title")}</h1>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <WidgetContainer title={t("systemHealth.storage")}>
-          {storage ? (
-            <ul className="text-sm text-text-secondary">
-              <li>
-                {t("systemHealth.attachments")}: {storage.attachmentCount}
-              </li>
-              <li>
-                {t("systemHealth.blobs")}: {storage.blobCount}
-              </li>
-              <li>
-                {t("systemHealth.usage")}:{" "}
-                {storage.estimatedUsageBytes
-                  ? `${Math.round(storage.estimatedUsageBytes / 1024)} KB`
-                  : t("systemHealth.notAvailable")}
-              </li>
-            </ul>
-          ) : (
-            "…"
-          )}
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.records")}>
-          {records ? (
-            <ul className="text-sm text-text-secondary">
-              {Object.entries(records).map(([key, value]) => (
-                <li key={key}>
-                  {t(`systemHealth.recordLabels.${key}`)}: {value}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            "…"
-          )}
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.backgroundJobs")}>
-          <ul className="text-sm text-text-secondary">
-            <li>
-              {t("systemHealth.notificationEvaluation")}: {t(jobs.notificationEvaluation)}
-            </li>
-            <li>
-              {t("systemHealth.workflowSlaCheck")}: {t(jobs.workflowSlaCheck)}
-            </li>
-          </ul>
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.syncStatus")}>
-          <p className="text-sm text-text-secondary">
-            {t("systemHealth.mode")}: {t(sync.modeKey)} · {t("systemHealth.pendingOfflineWrites")}:{" "}
-            {sync.pendingOfflineWrites}
-          </p>
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.backupStatus")}>
-          <p className="text-sm text-text-secondary">
-            {backup.available ? t("systemHealth.backupAvailable") : t(backup.reasonKey)}
-          </p>
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.auditStatistics")}>
-          {auditStats ? (
-            <ul className="text-sm text-text-secondary">
-              {Object.entries(auditStats).map(([action, count]) => (
-                <li key={action}>
-                  {t(`timeline.audit.${action}`)}: {count}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            "…"
-          )}
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.errors")}>
-          <ul className="text-sm text-status-expired">
-            {errors.length === 0 && <li className="text-text-secondary">{t("systemHealth.none")}</li>}
-            {errors.map((e) => (
-              <li key={e.id}>{e.message}</li>
-            ))}
-          </ul>
-        </WidgetContainer>
-
-        <WidgetContainer title={t("systemHealth.warnings")}>
-          <ul className="text-sm text-status-expiringSoon">
-            {warnings.length === 0 && <li className="text-text-secondary">{t("systemHealth.none")}</li>}
-            {warnings.map((w) => (
-              <li key={w.id}>{w.message}</li>
-            ))}
-          </ul>
-        </WidgetContainer>
-      </div>
-    </div>
-  );
+export interface StorageMetrics {
+  attachmentCount: number;
 }
+
+export interface RecordMetrics {
+  persons: number;
+  companies: number;
+  organizations: number;
+  documents: number;
+  communicationEntries: number;
+  masterDataRecords: number;
+}
+
+class HealthService {
+  async getStorageMetrics(): Promise<StorageMetrics> {
+    const { count, error } = await supabase.from("attachments").select("*", { count: "exact", head: true });
+    if (error) throw error;
+    return { attachmentCount: count ?? 0 };
+  }
+
+  async getRecordMetrics(): Promise<RecordMetrics> {
+    const [persons, companies, organizations, documents, communicationEntries, masterDataRecords] =
+      await Promise.all([
+        personRepository.count(),
+        companyRepository.count(),
+        organizationRepository.count(),
+        documentRepository.count(),
+        communicationRepository.count(),
+        masterDataRepository.count(),
+      ]);
+    return { persons, companies, organizations, documents, communicationEntries, masterDataRecords };
+  }
+
+  async getAuditStatistics() {
+    return auditEngine.countByAction();
+  }
+
+  getRecentErrors(limit = 20) {
+    return loggingService.getRecent("error", limit);
+  }
+
+  getRecentWarnings(limit = 20) {
+    return loggingService.getRecent("warning", limit);
+  }
+
+  /** Placeholders — real values arrive once the Notification/Workflow
+   *  scheduled jobs (Stage 3/Stage 6) exist. Reserved here so the Health
+   *  Center UI has a stable shape. Returns i18n KEYS, not literal English
+   *  text — the UI is what translates them (never hardcode interface text). */
+  getBackgroundJobStatus() {
+    return { notificationEvaluation: "systemHealth.notScheduled", workflowSlaCheck: "systemHealth.notScheduled" };
+  }
+
+  getSyncStatus() {
+    return { modeKey: "systemHealth.syncModeCloud", pendingOfflineWrites: 0 };
+  }
+
+  getBackupStatus() {
+    return { available: false as const, reasonKey: "systemHealth.backupUnavailableReason" };
+  }
+}
+
+export const healthService = new HealthService();

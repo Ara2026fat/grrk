@@ -1,4 +1,13 @@
-import { db } from "@/services/data/db";
+import { supabase } from "@/services/data/supabaseClient";
+import {
+  personRepository,
+  companyRepository,
+  organizationRepository,
+  documentRepository,
+  communicationRepository,
+  masterDataRepository,
+  attachmentRepository,
+} from "@/services/data/repositories";
 import { auditEngine } from "@/services/audit/AuditEngine";
 import { loggingService } from "@/services/logging/InMemoryLoggingService";
 
@@ -6,17 +15,14 @@ import { loggingService } from "@/services/logging/InMemoryLoggingService";
  * System Health Center foundation (Blueprint Standard 17.11).
  *
  * Per 17.11, this service is almost entirely a READ-ONLY aggregator over
- * infrastructure defined elsewhere — it introduces no new data sources of
- * its own except by reading the logging service. Storage metrics come from
- * the IndexedDB adapter directly (Standard 17.6); record counts come from
- * the repository layer (17.1); audit stats come from the Audit Engine
- * (Section 12).
+ * infrastructure defined elsewhere. Post-Supabase-migration: storage/record
+ * metrics come from the repository layer (17.1) reading from Supabase;
+ * audit stats come from the Audit Engine (Section 12).
  */
 export interface StorageMetrics {
   estimatedUsageBytes?: number;
   estimatedQuotaBytes?: number;
   attachmentCount: number;
-  blobCount: number;
 }
 
 export interface RecordMetrics {
@@ -31,27 +37,23 @@ export interface RecordMetrics {
 class HealthService {
   async getStorageMetrics(): Promise<StorageMetrics> {
     const estimate = await navigator.storage?.estimate?.().catch(() => undefined);
-    const [attachmentCount, blobCount] = await Promise.all([
-      db.attachments.count(),
-      db.attachmentBlobs.count(),
-    ]);
+    const attachmentCount = await attachmentRepository.count();
     return {
       estimatedUsageBytes: estimate?.usage,
       estimatedQuotaBytes: estimate?.quota,
       attachmentCount,
-      blobCount,
     };
   }
 
   async getRecordMetrics(): Promise<RecordMetrics> {
     const [persons, companies, organizations, documents, communicationEntries, masterDataRecords] =
       await Promise.all([
-        db.persons.count(),
-        db.companies.count(),
-        db.organizations.count(),
-        db.documents.count(),
-        db.communicationEntries.count(),
-        db.masterData.count(),
+        personRepository.count(),
+        companyRepository.count(),
+        organizationRepository.count(),
+        documentRepository.count(),
+        communicationRepository.count(),
+        masterDataRepository.count(),
       ]);
     return { persons, companies, organizations, documents, communicationEntries, masterDataRecords };
   }
@@ -78,7 +80,7 @@ class HealthService {
   }
 
   getSyncStatus() {
-    return { modeKey: "systemHealth.syncModeLocalOnly", pendingOfflineWrites: 0 };
+    return { modeKey: "systemHealth.syncModeCloud", pendingOfflineWrites: 0 };
   }
 
   getBackupStatus() {

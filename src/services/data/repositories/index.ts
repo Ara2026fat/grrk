@@ -11,6 +11,7 @@ import type {
 } from "@/types/entities";
 import type { NotificationRecord } from "@/services/notifications/NotificationEngine";
 import { BaseSupabaseRepository } from "../BaseSupabaseRepository";
+export { attachmentRepository } from "./AttachmentRepository";
 
 export const personRepository = new BaseSupabaseRepository<Person>("persons", "person");
 export const companyRepository = new BaseSupabaseRepository<Company>("companies", "company");

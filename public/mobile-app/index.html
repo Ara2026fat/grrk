@@ -45,6 +45,7 @@
   --btn-bg:rgba(79,114,224,.2); --btn-line:rgba(79,114,224,.4); --btn-ink:#C3D1FA;
   --shimmer:rgba(255,255,255,.5);
   --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(79,114,224,.17), transparent 70%), var(--void);
+  --icon-hl:rgba(255,255,255,.5); /* glossy highlight baked into every icon3d tile */
 }
 [data-theme="day"]{
   color-scheme:light;
@@ -56,12 +57,16 @@
   --edge:rgba(255,255,255,.95);
   --flat:rgba(0,0,0,.028); --flat-line:rgba(0,0,0,.06);
   --line:rgba(0,0,0,.07); --solid:#EDEBE2;
-  --glow:#2541A8; --glow-tint:rgba(37,65,168,.12);
+  --glow:#2541A8; --glow-tint:rgba(37,65,168,.16);
   --gold:#B9872E; --gold2:#8A6416;
   --ok:#188A5E; --warn:#A06A00; --danger:#C83C53;
-  --btn-bg:rgba(37,65,168,.14); --btn-line:rgba(37,65,168,.34); --btn-ink:#1C2E7A;
+  --btn-bg:rgba(37,65,168,.16); --btn-line:rgba(37,65,168,.4); --btn-ink:#1C2E7A;
   --shimmer:rgba(255,255,255,.85);
   --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(37,65,168,.12), transparent 70%), var(--void);
+  /* Icon tiles get a much lighter gloss highlight in day mode — the full
+     night-mode highlight washes bright accent colors out against the
+     near-white page background. */
+  --icon-hl:rgba(255,255,255,.14);
 }
 
 /* ---------- Accent color variants (layered on top of night/day) ---------- */
@@ -72,8 +77,8 @@
   --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(31,158,99,.16), transparent 70%), var(--void);
 }
 :root[data-theme="day"][data-accent="forest"]{
-  --glow:#146B45; --glow-tint:rgba(20,107,69,.12);
-  --btn-bg:rgba(20,107,69,.14); --btn-line:rgba(20,107,69,.32); --btn-ink:#0E4A30;
+  --glow:#146B45; --glow-tint:rgba(20,107,69,.16);
+  --btn-bg:rgba(20,107,69,.17); --btn-line:rgba(20,107,69,.38); --btn-ink:#0E4A30;
   --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(20,107,69,.1), transparent 70%), var(--void);
 }
 /* graphite — steel gray, understated and technical */
@@ -83,13 +88,30 @@
   --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(135,146,166,.15), transparent 70%), var(--void);
 }
 :root[data-theme="day"][data-accent="graphite"]{
-  --glow:#444E5E; --glow-tint:rgba(68,78,94,.12);
-  --btn-bg:rgba(68,78,94,.12); --btn-line:rgba(68,78,94,.3); --btn-ink:#2B3240;
+  --glow:#444E5E; --glow-tint:rgba(68,78,94,.16);
+  --btn-bg:rgba(68,78,94,.16); --btn-line:rgba(68,78,94,.36); --btn-ink:#2B3240;
   --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(68,78,94,.1), transparent 70%), var(--void);
+}
+/* amber — warm, glossy honey-gold accent */
+:root[data-theme="night"][data-accent="amber"]{
+  --glow:#F0B93C; --glow-tint:rgba(240,185,60,.2);
+  --btn-bg:rgba(240,185,60,.22); --btn-line:rgba(240,185,60,.44); --btn-ink:#FBE4A3;
+  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(240,185,60,.18), transparent 70%), var(--void);
+}
+:root[data-theme="day"][data-accent="amber"]{
+  --glow:#9C6B12; --glow-tint:rgba(156,107,18,.18);
+  --btn-bg:rgba(156,107,18,.18); --btn-line:rgba(156,107,18,.4); --btn-ink:#5C3E08;
+  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(156,107,18,.12), transparent 70%), var(--void);
 }
 
 *{box-sizing:border-box; margin:0}
 html,body{height:100%}
+/* Prevent the browser from silently shifting scroll position to "compensate"
+   for layout reflow above the fold — this happens when the web fonts finish
+   loading just after first paint (FOUT) and resize the text, which otherwise
+   made the page look like it opened scrolled past the hero straight to
+   whatever was next. */
+html{ overflow-anchor:none; }
 body{
   background:var(--app-bg); color:var(--ink); font-family:var(--body);
   line-height:1.6; -webkit-tap-highlight-color:transparent;
@@ -149,7 +171,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .btn.sm{ padding:9px 14px; font-size:13px; width:auto; border-radius:12px }
 .btn.danger{ background:rgba(255,107,129,.14); border-color:rgba(255,107,129,.34); color:var(--danger) }
 .fab{
-  position:fixed; inset-inline-end:20px; bottom:calc(204px + env(safe-area-inset-bottom));
+  position:fixed; inset-inline-end:20px; bottom:calc(88px + env(safe-area-inset-bottom));
   width:58px; height:58px; border-radius:50%; display:grid; place-items:center;
   background:linear-gradient(160deg, var(--glow), var(--gold2)); color:#fff; border:none;
   box-shadow:0 14px 30px -8px var(--glow-tint), 0 0 0 1px rgba(255,255,255,.14) inset;
@@ -177,7 +199,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 /* ---------- 3D glow icon tiles ---------- */
 .icon3d{
   width:46px; height:46px; border-radius:16px; display:grid; place-items:center; flex:none;
-  background:radial-gradient(120% 120% at 25% 20%, rgba(255,255,255,.5), transparent 55%), linear-gradient(155deg, var(--i1,var(--glow)), var(--i2,var(--gold2)));
+  background:radial-gradient(120% 120% at 25% 20%, var(--icon-hl), transparent 55%), linear-gradient(155deg, var(--i1,var(--glow)), var(--i2,var(--gold2)));
   box-shadow:0 10px 20px -8px var(--i1,var(--glow)), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.18);
   color:#fff; position:relative; overflow:hidden;
 }
@@ -200,7 +222,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .app-shell{ max-width:980px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column }
 .topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:16px 18px 14px; position:sticky; top:0; z-index:30; background:linear-gradient(var(--void) 72%, transparent); }
 .brand{ display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:700; font-size:17px }
-.main{ flex:1; padding:6px 16px 240px; }
+.main{ flex:1; padding:6px 16px 108px; }
 .navbar{
   position:fixed; inset-inline:0; bottom:0; z-index:35;
   display:grid; grid-template-columns:repeat(5, 1fr); gap:2px 0;
@@ -245,7 +267,36 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--glow); box-shadow:0 0 0 3px var(--glow-tint) }
 
 .empty{ text-align:center; padding:50px 20px; color:var(--ink-faint) }
-.toast{ position:fixed; inset-inline:16px; bottom:calc(208px + env(safe-area-inset-bottom)); max-width:420px; margin:auto; background:var(--solid); color:var(--ink); border:1px solid var(--glass-line); padding:13px 18px; border-radius:14px; font-size:14px; z-index:300; animation:sheet-in .25s var(--ease) }
+.toast{ position:fixed; inset-inline:16px; bottom:calc(92px + env(safe-area-inset-bottom)); max-width:420px; margin:auto; background:var(--solid); color:var(--ink); border:1px solid var(--glass-line); padding:13px 18px; border-radius:14px; font-size:14px; z-index:300; animation:sheet-in .25s var(--ease) }
+
+/* ---------- "More" hub sheet ---------- */
+.more-handle{ width:40px; height:4px; border-radius:99px; background:var(--flat-line); margin:0 auto 16px }
+.more-sheet{ max-height:82vh; overflow-y:auto; overscroll-behavior:contain }
+.more-group{ margin-bottom:20px }
+.more-group:last-child{ margin-bottom:4px }
+.more-group-label{ font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--ink-faint); text-transform:uppercase; margin-bottom:10px; padding-inline-start:2px }
+.more-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px }
+.more-tile{
+  display:flex; align-items:center; gap:12px; text-align:start; cursor:pointer;
+  background:var(--flat); border:1px solid var(--flat-line); border-radius:var(--radius-md);
+  padding:13px 14px; color:inherit; width:100%;
+  transition:border-color var(--dur-base) ease, background var(--dur-base) ease, transform var(--dur-fast) ease;
+  animation:rise .36s var(--ease) both;
+}
+.more-tile:active{ transform:scale(.97) }
+.more-tile:hover{ border-color:var(--glow); background:var(--glass) }
+.more-tile-text{ display:flex; flex-direction:column; gap:1px; min-width:0 }
+.more-tile-label{ font-size:13.5px; font-weight:700 }
+.more-tile-sub{ font-size:11px; color:var(--ink-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.more-group:nth-child(1) .more-tile:nth-child(1){animation-delay:.02s}
+.more-group:nth-child(1) .more-tile:nth-child(2){animation-delay:.05s}
+.more-group:nth-child(1) .more-tile:nth-child(3){animation-delay:.08s}
+.more-group:nth-child(1) .more-tile:nth-child(4){animation-delay:.11s}
+.more-group:nth-child(2) .more-tile:nth-child(1){animation-delay:.1s}
+.more-group:nth-child(2) .more-tile:nth-child(2){animation-delay:.13s}
+.more-group:nth-child(2) .more-tile:nth-child(3){animation-delay:.16s}
+.more-group:nth-child(3) .more-tile:nth-child(1){animation-delay:.18s}
+.more-group:nth-child(3) .more-tile:nth-child(2){animation-delay:.21s}
 
 ::-webkit-scrollbar{ width:0; height:0 }
 </style>
@@ -530,7 +581,9 @@ function renderDashboard(root, ctx){
     organizations: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4-8 4-8-4 8-4z"/><path d="M4 11v6l8 4 8-4v-6"/></svg>',
     documents: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
     check: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
-    alert: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.9 17.1A1.8 1.8 0 0 0 4.5 20h15a1.8 1.8 0 0 0 1.6-2.9L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg>',
+    // Animated "radar" glyph for at-risk items (expiring/inactive) — reads
+    // as "actively scanning for risk" instead of a static warning triangle.
+    alert: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.3" stroke="currentColor" stroke-width="1.1" opacity=".3"/><circle cx="12" cy="12" r="6.2" stroke="currentColor" stroke-width="1.1" opacity=".42"/><circle cx="12" cy="12" r="3.1" stroke="currentColor" stroke-width="1.1" opacity=".55"/><path d="M12 12 L12 2.7 A9.3 9.3 0 0 1 20.3 8 Z" fill="currentColor" opacity=".5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="2.2s" repeatCount="indefinite"/></path><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.6" cy="7.4" r="1.15" fill="currentColor"><animate attributeName="opacity" values="0;0;1;0" keyTimes="0;.55;.63;1" dur="2.2s" repeatCount="indefinite"/></circle></svg>',
     reports: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M20 20H4"/></svg>',
     profiles: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-1.8 1.8-2.6 3-2.6s2.5.8 3 2.6M14.5 10h4M14.5 13.5h4"/></svg>',
     settings: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4.6a7.6 7.6 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-.6-2 3.4L6.4 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-.6c.5.4 1.1.75 1.7 1l.4 2.6h4l.4-2.6c.6-.25 1.2-.6 1.7-1l2.4.6 2-3.4-2-1.6z"/></svg>',
@@ -2820,23 +2873,32 @@ function renderAlerts(root, ctx){
     return items;
   }
 
+  // Animated "radar" glyph for anything still at risk (expiring soon or
+  // already overdue) — a static ring sweep that reads as "being watched",
+  // used for both the danger and warn states.
+  const RADAR_SVG = `<svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9.3" stroke="currentColor" stroke-width="1.1" opacity=".3"/>
+      <circle cx="12" cy="12" r="6.2" stroke="currentColor" stroke-width="1.1" opacity=".42"/>
+      <circle cx="12" cy="12" r="3.1" stroke="currentColor" stroke-width="1.1" opacity=".55"/>
+      <path d="M12 12 L12 2.7 A9.3 9.3 0 0 1 20.3 8 Z" fill="currentColor" opacity=".5">
+        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="2.2s" repeatCount="indefinite"/>
+      </path>
+      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+      <circle cx="15.6" cy="7.4" r="1.15" fill="currentColor">
+        <animate attributeName="opacity" values="0;0;1;0" keyTimes="0;.55;.63;1" dur="2.2s" repeatCount="indefinite"/>
+      </circle>
+    </svg>`;
   function iconSvg(status){
-    if(status === 'danger'){
-      return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 9v4"/><path d="M12 16.5h.01"/>
-        <path d="M10.3 3.9 2.6 17.1a1.6 1.6 0 0 0 1.4 2.4h16a1.6 1.6 0 0 0 1.4-2.4L13.7 3.9a1.6 1.6 0 0 0-2.8 0Z"/>
-      </svg>`;
+    if(status === 'danger' || status === 'warn'){
+      return RADAR_SVG;
     }
     if(status === 'ok'){
       return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.6 2.6L16 9.5"/>
       </svg>`;
     }
-    // bell for warn / amber(31-60)
-    return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M18 8a6 6 0 0 0-12 0c0 3.2-1 5-2 7h16c-1-2-2-3.8-2-7Z"/>
-      <path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>
-    </svg>`;
+    // amber (31-60 day) band — still worth watching, radar as well
+    return RADAR_SVG;
   }
 
   function iconGradient(status){
@@ -3435,10 +3497,16 @@ function renderSettings(root, ctx){
   const isAr = lang === 'ar';
   const curTheme = document.documentElement.getAttribute('data-theme') || 'night';
   const curAccent = document.documentElement.getAttribute('data-accent') || 'indigo';
+  // Swatch preview colors must match what the theme will actually look like —
+  // each accent has its own night/day pair (see design-tokens.css), so the
+  // preview uses whichever one is live right now instead of always showing
+  // the night-mode shade even while in day mode.
+  const isNight = curTheme === 'night';
   const ACCENTS = [
-    {key:'indigo', c1:'#4F72E0', c2:'#8A6416', labelAr:'كحلي', labelEn:'Navy'},
-    {key:'forest', c1:'#1F9E63', c2:'#8A6416', labelAr:'أخضر داكن', labelEn:'Forest'},
-    {key:'graphite', c1:'#8792A6', c2:'#8A6416', labelAr:'رمادي فولاذي', labelEn:'Graphite'},
+    {key:'indigo', c1: isNight ? '#4F72E0' : '#2541A8', c2:'#8A6416', labelAr:'كحلي', labelEn:'Navy'},
+    {key:'forest', c1: isNight ? '#1F9E63' : '#146B45', c2:'#8A6416', labelAr:'أخضر داكن', labelEn:'Forest'},
+    {key:'amber', c1: isNight ? '#F0B93C' : '#9C6B12', c2: isNight ? '#B4790F' : '#5C3E08', labelAr:'أصفر لامع', labelEn:'Amber'},
+    {key:'graphite', c1: isNight ? '#8792A6' : '#444E5E', c2:'#8A6416', labelAr:'رمادي فولاذي', labelEn:'Graphite'},
   ];
 
   const screen = document.createElement('div');
@@ -5309,6 +5377,13 @@ function renderArchive(root, ctx){
 (function(){
   const APP = document.getElementById('app');
 
+  // Stop the browser's own scroll-restoration from fighting the app's — on
+  // some mobile browsers a normal reload re-applies the last scroll offset
+  // (or, combined with the web-font swap reflow, "helpfully" keeps whatever
+  // was under the viewport in place), which made the home screen look like
+  // it opened already scrolled past the hero straight to the alerts list.
+  try{ if('scrollRestoration' in history) history.scrollRestoration = 'manual'; }catch(e){}
+
   const STORE_KEY = 'grrk_ui_v1';
   function loadUI(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }catch(e){ return {}; } }
   function saveUI(ui){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(ui)); }catch(e){} }
@@ -5338,7 +5413,10 @@ function renderArchive(root, ctx){
     visitors:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 3v3M16 3v3M3.5 10h17"/><path d="m9 15 2 2 4-4"/></svg>',
     companiesorgs:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V6l7-3 7 3v15"/><path d="M4 21h16M9 21v-5h4v5M9 11h.01M14 11h.01M9 8h.01M14 8h.01"/></svg>',
     documents:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
-    alerts:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5c-4 0-5.6 3-5.6 6.2 0 2.6-.6 4-2 5.3h15.2c-1.4-1.3-2-2.7-2-5.3 0-3.2-1.6-6.2-5.6-6.2Z"/><path d="M9.3 18.5a2.8 2.8 0 0 0 5.4 0"/></svg>',
+    // Animated "radar" glyph — used for alerts/at-risk items (expiring or
+    // inactive contracts, documents, etc.) so the icon itself reads as
+    // "actively scanning for risk" instead of a static bell.
+    alerts:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.3" stroke="currentColor" stroke-width="1.1" opacity=".3"/><circle cx="12" cy="12" r="6.2" stroke="currentColor" stroke-width="1.1" opacity=".42"/><circle cx="12" cy="12" r="3.1" stroke="currentColor" stroke-width="1.1" opacity=".55"/><path d="M12 12 L12 2.7 A9.3 9.3 0 0 1 20.3 8 Z" fill="currentColor" opacity=".5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="2.2s" repeatCount="indefinite"/></path><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.6" cy="7.4" r="1.15" fill="currentColor"><animate attributeName="opacity" values="0;0;1;0" keyTimes="0;.55;.63;1" dur="2.2s" repeatCount="indefinite"/></circle></svg>',
     reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M20 20H4"/></svg>',
     profiles:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-1.8 1.8-2.6 3-2.6s2.5.8 3 2.6M14.5 10h4M14.5 13.5h4"/></svg>',
     settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4.6a7.6 7.6 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-.6-2 3.4L6.4 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-.6c.5.4 1.1.75 1.7 1l.4 2.6h4l.4-2.6c.6-.25 1.2-.6 1.7-1l2.4.6 2-3.4-2-1.6Z"/></svg>',
@@ -5364,19 +5442,45 @@ function renderArchive(root, ctx){
   ];
 
   // The rest of the sections — reachable via the "More" sheet and the
-  // Dashboard's Quick Access grid.
-  const MORE_ITEMS = [
-    {key:'contractors', i1:'#6FA8E0', i2:'#2E6FA8'},
-    {key:'visitors', i1:'#E0A86F', i2:'#A86F2E'},
-    {key:'companiesorgs', i1:'#7FD6A8', i2:'#2E9966'},
-    {key:'alerts', i1:'#FFC168', i2:'#B4790F'},
-    {key:'profiles', i1:'#8CC8E8', i2:'#2E7FA8'},
-    {key:'library', i1:'#5FB8D9', i2:'#2E7F9C'},
-    {key:'forms', i1:'#9AA5B8', i2:'#5A6578'},
-    {key:'archive', i1:'#C9A45C', i2:'#8A6416'},
-    {key:'settings', i1:'var(--ink-faint)', i2:'var(--ink-soft)'},
+  // Dashboard's Quick Access grid. Grouped into categories so the sheet reads
+  // as a curated hub rather than one flat wall of icons.
+  const MORE_GROUPS = [
+    { labelAr:'العلاقات والجهات', labelEn:'Relations & Entities', items:[
+      {key:'contractors', i1:'#6FA8E0', i2:'#2E6FA8'},
+      {key:'visitors', i1:'#E0A86F', i2:'#A86F2E'},
+      {key:'companiesorgs', i1:'#7FD6A8', i2:'#2E9966'},
+      {key:'profiles', i1:'#8CC8E8', i2:'#2E7FA8'},
+    ]},
+    { labelAr:'الموارد والمحتوى', labelEn:'Resources & Content', items:[
+      {key:'library', i1:'#5FB8D9', i2:'#2E7F9C'},
+      {key:'forms', i1:'#9AA5B8', i2:'#5A6578'},
+      {key:'archive', i1:'#C9A45C', i2:'#8A6416'},
+    ]},
+    { labelAr:'المتابعة والنظام', labelEn:'Monitoring & System', items:[
+      {key:'alerts', i1:'#FFC168', i2:'#B4790F'},
+      {key:'settings', i1:'var(--ink-faint)', i2:'var(--ink-soft)'},
+    ]},
   ];
+  const MORE_ITEMS = MORE_GROUPS.flatMap(g=>g.items);
   const PRIMARY_KEYS = NAV.map(n=>n.key).filter(k=>k!=='more');
+
+  function moreTileSub(key){
+    const n = (coll)=>{ try{ return DB.list(coll).length; }catch(e){ return 0; } };
+    const isAr = state.lang === 'ar';
+    const rec = isAr ? 'سجل' : 'records';
+    const map = {
+      contractors: n('contractors') + ' ' + rec,
+      visitors: n('visitors') + ' ' + rec,
+      companiesorgs: (n('companies') + n('organizations')) + ' ' + rec,
+      profiles: isAr ? 'استعراض الملفات' : 'Browse profiles',
+      library: n('library') + (isAr ? ' عنصر' : ' items'),
+      forms: n('forms') + (isAr ? ' نموذج' : ' forms'),
+      archive: n('archiveItems') + (isAr ? ' عنصر' : ' items'),
+      alerts: isAr ? 'رصد المخاطر' : 'Risk monitoring',
+      settings: isAr ? 'اللغة والمظهر' : 'Language & theme',
+    };
+    return map[key] || '';
+  }
 
   function navLabel(key, t){
     const map = {
@@ -5499,6 +5603,9 @@ function renderArchive(root, ctx){
       // the person manually scrolls up.
       main.scrollTop = 0;
       try{ window.scrollTo({top:0, left:0}); }catch(e){}
+      // Safety net: if a web font swap or late image/layout reflow shifts
+      // the page just after this runs, snap back to the top once more.
+      setTimeout(()=>{ try{ window.scrollTo({top:0, left:0}); }catch(e){} }, 120);
     };
     if(skipAnim){ mount(); return; }
     const old = main.querySelector('.screen');
@@ -5598,16 +5705,28 @@ function renderArchive(root, ctx){
   // ---------------- "More" hub sheet (the other sections live here) ----------------
   function openMoreSheet(){
     const t = I18N[state.lang];
-    const title = state.lang==='ar' ? 'المزيد من الأقسام' : 'More sections';
-    const tilesHtml = MORE_ITEMS.map(n=>`
-      <button type="button" class="more-tile" data-more-go="${n.key}">
-        <span class="icon3d" style="--i1:${n.i1};--i2:${n.i2}">${ICONS[n.key]}</span>
-        <span class="more-tile-label">${navLabel(n.key, t)}</span>
-      </button>
+    const isAr = state.lang === 'ar';
+    const title = isAr ? 'المزيد من الأقسام' : 'More sections';
+    const groupsHtml = MORE_GROUPS.map(g=>`
+      <div class="more-group">
+        <div class="more-group-label">${isAr ? g.labelAr : g.labelEn}</div>
+        <div class="more-grid">
+          ${g.items.map(n=>`
+            <button type="button" class="more-tile" data-more-go="${n.key}">
+              <span class="icon3d" style="--i1:${n.i1};--i2:${n.i2}">${ICONS[n.key]}</span>
+              <span class="more-tile-text">
+                <span class="more-tile-label">${navLabel(n.key, t)}</span>
+                <span class="more-tile-sub num">${moreTileSub(n.key)}</span>
+              </span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
     `).join('');
     const html = `
-      <h2 class="h2" style="margin-bottom:14px">${title}</h2>
-      <div class="more-grid">${tilesHtml}</div>
+      <div class="more-handle"></div>
+      <h2 class="h2" style="margin-bottom:16px">${title}</h2>
+      ${groupsHtml}
     `;
     openOverlay(html, (sheet)=>{
       sheet.querySelectorAll('[data-more-go]').forEach(btn=>{

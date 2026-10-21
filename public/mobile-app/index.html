@@ -52,24 +52,27 @@
 }
 [data-theme="day"]{
   color-scheme:light;
-  --void:#F3F2EC; --void2:#ECEAE1; --lift1:#FFFFFF; --lift2:#F7F6F0;
+  /* The page background sits a visible shade below pure white so the
+     glass cards (--lift1, pure white) and icon tiles actually read as
+     lifted/frosted surfaces instead of blending into the page. */
+  --void:#EAE7DD; --void2:#E2DDCF; --lift1:#FFFFFF; --lift2:#FBFAF5;
   --ink:#1C1E2A; --ink-soft:#5B5F72; --ink-faint:#9497A6;
-  --glass:linear-gradient(158deg, rgba(255,255,255,.75), rgba(255,255,255,.4));
-  --glass-line:rgba(0,0,0,.07);
-  --glass-shadow:0 16px 38px rgba(40,40,60,.1), 0 2px 0 rgba(255,255,255,.6) inset;
+  --glass:linear-gradient(158deg, rgba(255,255,255,.94), rgba(255,255,255,.6));
+  --glass-line:rgba(20,22,40,.1);
+  --glass-shadow:0 20px 42px rgba(40,40,70,.15), 0 2px 0 rgba(255,255,255,.75) inset;
   --edge:rgba(255,255,255,.95);
-  --flat:rgba(0,0,0,.028); --flat-line:rgba(0,0,0,.06);
-  --line:rgba(0,0,0,.07); --solid:#EDEBE2;
+  --flat:rgba(0,0,0,.035); --flat-line:rgba(0,0,0,.08);
+  --line:rgba(0,0,0,.08); --solid:#FFFFFF;
   --glow:#2541A8; --glow-tint:rgba(37,65,168,.16);
   --gold:#B9872E; --gold2:#8A6416;
   --ok:#188A5E; --warn:#A06A00; --danger:#C83C53;
   --btn-bg:rgba(37,65,168,.16); --btn-line:rgba(37,65,168,.4); --btn-ink:#1C2E7A;
   --shimmer:rgba(255,255,255,.85);
   --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(37,65,168,.34), transparent 68%), var(--void);
-  /* Icon tiles get a much lighter gloss highlight in day mode — the full
-     night-mode highlight washes bright accent colors out against the
-     near-white page background. */
-  --icon-hl:rgba(255,255,255,.14);
+  /* A brighter gloss highlight than the earlier near-zero value — enough
+     to give icon tiles a real glassy sheen without washing the accent
+     color out against the page. */
+  --icon-hl:rgba(255,255,255,.32);
 }
 
 /* ---------- Accent color variants (layered on top of night/day) ---------- */
@@ -209,7 +212,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .icon3d{
   width:52px; height:52px; border-radius:17px; display:grid; place-items:center; flex:none;
   background:radial-gradient(120% 120% at 25% 20%, var(--icon-hl), transparent 55%), linear-gradient(155deg, var(--i1,var(--glow)), var(--i2,var(--gold2)));
-  box-shadow:0 10px 20px -8px var(--i1,var(--glow)), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.18);
+  box-shadow:0 14px 26px -8px var(--i1,var(--glow)), 0 2px 6px -2px var(--i1,var(--glow)), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -3px 6px rgba(0,0,0,.2);
   color:#fff; position:relative; overflow:hidden;
 }
 .icon3d.sm{ width:36px; height:36px; border-radius:12px }
@@ -367,7 +370,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-21T21:57:56Z', dmy: '22/10/2026', hm: '00:57' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-21T22:06:46Z', dmy: '22/10/2026', hm: '01:06' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5749,6 +5752,11 @@ function renderArchive(root, ctx){
         fn(inner, ctx);
       }
       wireDataNav(inner, ctx);
+      // Light up an icon on this screen right away (not just on the next
+      // periodic tick) so the relay is visible immediately after navigating,
+      // not only on screens the person happens to linger on.
+      tickIconChase();
+      scheduleChaseTick();
       // Always land at the top of the new screen — without this, the scroll
       // position from the previous screen carries over and the new screen's
       // own content (e.g. the Dashboard hero) can appear to not show until
@@ -5970,6 +5978,7 @@ function renderArchive(root, ctx){
   // next. Re-samples the DOM on every tick (cheap) so it stays correct
   // across screen navigation without any render-function coordination.
   let chaseIdx = 0;
+  let chaseTimer = null;
   function tickIconChase(){
     document.querySelectorAll('.icon3d.chase-on').forEach(el => el.classList.remove('chase-on'));
     const icons = document.querySelectorAll('.icon3d');
@@ -5980,6 +5989,15 @@ function renderArchive(root, ctx){
     chaseIdx = chaseIdx % icons.length;
     icons[chaseIdx].classList.add('chase-on');
     chaseIdx++;
+  }
+  // Re-schedules the NEXT tick relative to whichever activation just
+  // happened (periodic or a fresh screen mount). A plain setInterval would
+  // keep ticking on its own old absolute schedule, so a screen navigated to
+  // right before that old tick fires would lose its newly-lit icon almost
+  // immediately — this keeps every icon lit for the same full, slow interval.
+  function scheduleChaseTick(){
+    clearTimeout(chaseTimer);
+    chaseTimer = setTimeout(()=>{ tickIconChase(); scheduleChaseTick(); }, 2600);
   }
 
   // ---------------- Boot ----------------
@@ -5993,7 +6011,7 @@ function renderArchive(root, ctx){
     renderScreen('dashboard', true);
     renderInstallBanner();
     tickIconChase();
-    setInterval(tickIconChase, 2600); // extremely slow, deliberate icon-by-icon relay
+    scheduleChaseTick(); // extremely slow, deliberate icon-by-icon relay
   }
   boot();
 })();

@@ -249,6 +249,9 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 
 ::-webkit-scrollbar{ width:0; height:0 }
 </style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.2/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -257,6 +260,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
     <nav class="navbar" id="navbar"></nav>
   </div>
   <script>
+
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -363,7 +367,118 @@ const I18N = {
        viewAll:'View all', noAlerts:'No active alerts — everything is under control ✓' }
 };
 
-// ===== module: dashboard =====
+/* ============================================================
+   GRRK — Export & Share utilities (shared across all modules)
+   Uses CDN libraries loaded in <head>: XLSX (SheetJS), jsPDF, html2canvas.
+   All functions are defensive: if a library failed to load (e.g. the
+   device is offline), they fall back gracefully with a toast instead
+   of throwing.
+   ============================================================ */
+const GRRK_EXPORT = (function(){
+
+  function isAr(){ return (document.documentElement.getAttribute('lang') || 'ar') === 'ar'; }
+  function tr(ar, en){ return isAr() ? ar : en; }
+
+  function notify(msg){
+    // Modules pass their own ctx.showToast; this is a last-resort fallback
+    // for code paths that don't have ctx in scope.
+    try{
+      const el = document.getElementById('toastEl');
+      if(el){ el.textContent = msg; el.style.display='block'; setTimeout(()=>{ el.style.display='none'; }, 2600); return; }
+    }catch(e){}
+    console.warn('[GRRK export]', msg);
+  }
+
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 4000);
+  }
+
+  // Share a File via the native OS share sheet (WhatsApp/Email/etc. on mobile).
+  // Falls back to downloading the file if Web Share (with files) isn't supported —
+  // the user can then attach it manually from their downloads/files app.
+  async function shareFile(blob, filename, mimeType, title, showToastFn){
+    const toast = showToastFn || notify;
+    const file = new File([blob], filename, {type: mimeType});
+    try{
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title: title || filename});
+        return 'shared';
+      }
+    }catch(err){
+      // user cancelled the share sheet — not an error, do nothing further
+      if(err && err.name === 'AbortError') return 'cancelled';
+    }
+    // Fallback: just download it, and tell the user how to send it themselves.
+    downloadBlob(blob, filename);
+    toast(tr('تم تنزيل الملف — أرفقه يدوياً في واتساب أو البريد', 'File downloaded — attach it manually in WhatsApp or email'));
+    return 'downloaded';
+  }
+
+  // Share plain text/a link (always works — every browser with Web Share supports text).
+  async function shareText(text, title, showToastFn){
+    const toast = showToastFn || notify;
+    try{
+      if(navigator.share){ await navigator.share({text, title: title || ''}); return 'shared'; }
+    }catch(err){
+      if(err && err.name === 'AbortError') return 'cancelled';
+    }
+    try{ await navigator.clipboard.writeText(text); toast(tr('تم نسخ الرابط','Link copied')); return 'copied'; }
+    catch(e){ toast(tr('تعذرت المشاركة','Could not share')); return 'failed'; }
+  }
+
+  // ---- Excel export ----
+  // rows: array of plain objects (keys become column headers, in insertion order)
+  function exportExcel(rows, filename, sheetName){
+    if(typeof XLSX === 'undefined'){ notify(tr('مكتبة إكسل غير متاحة (تحتاج اتصال إنترنت أول مرة)','Excel library unavailable (needs internet the first time)')); return null; }
+    const ws = XLSX.utils.json_to_sheet(rows || []);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Sheet1');
+    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    return new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }
+
+  // ---- PDF export (simple tabular report) ----
+  // columns: [{key,label}], rows: array of objects
+  function exportPDF(title, columns, rows){
+    const JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if(!JsPDFCtor){ notify(tr('مكتبة PDF غير متاحة (تحتاج اتصال إنترنت أول مرة)','PDF library unavailable (needs internet the first time)')); return null; }
+    const doc = new JsPDFCtor({orientation:'p', unit:'pt', format:'a4'});
+    const marginX = 40; let y = 50;
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text(String(title || 'GRRK Report'), marginX, y); y += 14;
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.text(new Date().toISOString().slice(0,10), marginX, y); y += 20;
+
+    const colWidth = (595 - marginX*2) / columns.length;
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    columns.forEach((c,i)=> doc.text(String(c.label).slice(0,28), marginX + i*colWidth, y));
+    y += 6; doc.setLineWidth(0.5); doc.line(marginX, y, 595-marginX, y); y += 14;
+    doc.setFont('helvetica','normal');
+    (rows||[]).forEach(row=>{
+      if(y > 780){ doc.addPage(); y = 50; }
+      columns.forEach((c,i)=>{
+        const val = row[c.key] == null ? '' : String(row[c.key]);
+        doc.text(val.slice(0,30), marginX + i*colWidth, y);
+      });
+      y += 16;
+    });
+    return doc.output('blob');
+  }
+
+  // ---- Image export: snapshot a DOM element (e.g. a report card) as PNG ----
+  async function exportImage(el){
+    if(typeof html2canvas === 'undefined'){ notify(tr('مكتبة الصور غير متاحة (تحتاج اتصال إنترنت أول مرة)','Image library unavailable (needs internet the first time)')); return null; }
+    const canvas = await html2canvas(el, {backgroundColor: getComputedStyle(document.body).backgroundColor || '#0B0D14', scale: 2});
+    return new Promise(resolve=> canvas.toBlob(blob=> resolve(blob), 'image/png'));
+  }
+
+  return { downloadBlob, shareFile, shareText, exportExcel, exportPDF, exportImage };
+})();
+
 // MODULE: Dashboard
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_DASHBOARD = `
@@ -456,7 +571,7 @@ function renderDashboard(root, ctx){
       </div>`;
 
   root.innerHTML = `
-    <div class="screen">
+    <div>
       <div class="glass dash-hero">
         <div class="dash-greet">
           <div>
@@ -511,7 +626,6 @@ function renderDashboard(root, ctx){
   `;
 }
 
-// ===== module: employees =====
 // MODULE: Employees
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_EMPLOYEES = `
@@ -535,6 +649,8 @@ const CSS_EMPLOYEES = `
 .emp-actions{ display:flex; gap:10px }
 .emp-actions .btn{ flex:1 }
 .emp-confirm-txt{ font-size:14px; color:var(--ink-soft); margin-bottom:18px; line-height:1.7 }
+.emp-export-row{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap }
+.emp-export-row .btn{ flex:none }
 `;
 
 // Mount function — called by the shell router.
@@ -572,6 +688,15 @@ function renderEmployees(root, ctx){
     daysLeft: t.daysLeft,
     noExpiry: isAr ? 'بدون تاريخ' : 'No date',
     required: isAr ? 'الاسم والوظيفة مطلوبان' : 'Name and role are required',
+    exportExcel: isAr ? 'تصدير Excel' : 'Export Excel',
+    exportPDF: isAr ? 'تصدير PDF' : 'Export PDF',
+    colName: isAr ? 'الاسم' : 'Name',
+    colRole: isAr ? 'الوظيفة' : 'Role',
+    colDept: isAr ? 'الإدارة' : 'Department',
+    colPhone: isAr ? 'الهاتف' : 'Phone',
+    colIdExpiry: isAr ? 'تاريخ انتهاء الهوية' : 'ID Expiry',
+    colStatus: isAr ? 'الحالة' : 'Status',
+    reportTitle: isAr ? 'تقرير الموظفين' : 'Employees Report',
   };
 
   function daysUntil(dateStr){
@@ -652,6 +777,45 @@ function renderEmployees(root, ctx){
         </div>
       </div>
     `;
+  }
+
+  function statusLabelText(e){ return e.status === 'inactive' ? L.inactiveLbl : L.activeLbl; }
+
+  function exportRows(){
+    return getFiltered().map(e => ({
+      [L.colName]: displayName(e),
+      [L.colRole]: e.role || '',
+      [L.colDept]: e.dept || '',
+      [L.colPhone]: e.phone || '',
+      [L.colIdExpiry]: e.idExpiry || '',
+      [L.colStatus]: statusLabelText(e),
+    }));
+  }
+
+  async function doExportExcel(){
+    const blob = GRRK_EXPORT.exportExcel(exportRows(), 'employees.xlsx', L.title);
+    if(!blob) return;
+    const filename = `GRRK-employees-${new Date().toISOString().slice(0,10)}.xlsx`;
+    await GRRK_EXPORT.shareFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', L.title, ctx.showToast);
+  }
+
+  async function doExportPDF(){
+    const columns = [
+      {key:'name', label: L.colName},
+      {key:'role', label: L.colRole},
+      {key:'dept', label: L.colDept},
+      {key:'phone', label: L.colPhone},
+      {key:'idExpiry', label: L.colIdExpiry},
+      {key:'status', label: L.colStatus},
+    ];
+    const rows = getFiltered().map(e => ({
+      name: displayName(e), role: e.role || '', dept: e.dept || '',
+      phone: e.phone || '', idExpiry: e.idExpiry || '', status: statusLabelText(e),
+    }));
+    const blob = GRRK_EXPORT.exportPDF(L.reportTitle, columns, rows);
+    if(!blob) return;
+    const filename = `GRRK-employees-${new Date().toISOString().slice(0,10)}.pdf`;
+    await GRRK_EXPORT.shareFile(blob, filename, 'application/pdf', L.title, ctx.showToast);
   }
 
   function renderList(){
@@ -821,7 +985,7 @@ function renderEmployees(root, ctx){
   }
 
   root.innerHTML = `
-    <div class="screen">
+    <div>
       <div class="glass">
         <div class="emp-hero-row">
           <div>
@@ -831,6 +995,10 @@ function renderEmployees(root, ctx){
         </div>
         <div class="field emp-search">
           <input type="text" id="empSearchInput" placeholder="${esc(L.searchPh)}" />
+        </div>
+        <div class="emp-export-row">
+          <button type="button" class="btn sm" id="empExportExcel">${esc(L.exportExcel)}</button>
+          <button type="button" class="btn sm" id="empExportPDF">${esc(L.exportPDF)}</button>
         </div>
       </div>
       <div class="emp-list stagger" id="empList"></div>
@@ -847,11 +1015,12 @@ function renderEmployees(root, ctx){
   });
 
   root.querySelector('#empFab').addEventListener('click', () => openForm(null));
+  root.querySelector('#empExportExcel').addEventListener('click', doExportExcel);
+  root.querySelector('#empExportPDF').addEventListener('click', doExportPDF);
 
   renderList();
 }
 
-// ===== module: contractors =====
 // MODULE: Contractors
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_CONTRACTORS = `
@@ -882,6 +1051,8 @@ const CSS_CONTRACTORS = `
 .con-actions .btn{ flex:1 }
 .con-confirm{ text-align:center; padding:6px 0 }
 .con-confirm .con-warn-icon{ margin:0 auto 14px; }
+.con-export-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
+.con-export-row .btn{ flex:none }
 `;
 
 // Mount function — called by the shell router.
@@ -916,6 +1087,15 @@ function renderContractors(root, ctx){
     noDate: isAr ? 'غير محدد' : 'Not set',
     required: isAr ? 'الاسم ورقم التواصل مطلوبان' : 'Name and contact are required',
     statusActive: isAr ? 'نشط' : 'active',
+    statusInactive: isAr ? 'غير نشط' : 'inactive',
+    exportExcel: isAr ? 'تصدير Excel' : 'Export Excel',
+    exportPDF: isAr ? 'تصدير PDF' : 'Export PDF',
+    colName: isAr ? 'الاسم' : 'Name',
+    colService: isAr ? 'نوع الخدمة' : 'Service',
+    colContact: isAr ? 'رقم التواصل' : 'Contact',
+    colContractEnd: isAr ? 'نهاية العقد' : 'Contract End',
+    colStatus: isAr ? 'الحالة' : 'Status',
+    reportTitle: isAr ? 'تقرير المقاولين' : 'Contractors Report',
   };
 
   function daysUntilLocal(dateStr){
@@ -974,6 +1154,43 @@ function renderContractors(root, ctx){
       if(db === null) return -1;
       return da - db;
     });
+  }
+
+  function statusLabelText(c){ return c.status === 'inactive' ? L.statusInactive : L.statusActive; }
+
+  function exportRows(){
+    return getList().map(c => ({
+      [L.colName]: nameOf(c),
+      [L.colService]: c.service || '',
+      [L.colContact]: c.contact || '',
+      [L.colContractEnd]: c.contractEnd || '',
+      [L.colStatus]: statusLabelText(c),
+    }));
+  }
+
+  async function doExportExcel(){
+    const blob = GRRK_EXPORT.exportExcel(exportRows(), 'contractors.xlsx', L.title);
+    if(!blob) return;
+    const filename = `GRRK-contractors-${new Date().toISOString().slice(0,10)}.xlsx`;
+    await GRRK_EXPORT.shareFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', L.title, ctx.showToast);
+  }
+
+  async function doExportPDF(){
+    const columns = [
+      {key:'name', label: L.colName},
+      {key:'service', label: L.colService},
+      {key:'contact', label: L.colContact},
+      {key:'contractEnd', label: L.colContractEnd},
+      {key:'status', label: L.colStatus},
+    ];
+    const rows = getList().map(c => ({
+      name: nameOf(c), service: c.service || '', contact: c.contact || '',
+      contractEnd: c.contractEnd || '', status: statusLabelText(c),
+    }));
+    const blob = GRRK_EXPORT.exportPDF(L.reportTitle, columns, rows);
+    if(!blob) return;
+    const filename = `GRRK-contractors-${new Date().toISOString().slice(0,10)}.pdf`;
+    await GRRK_EXPORT.shareFile(blob, filename, 'application/pdf', L.title, ctx.showToast);
   }
 
   function renderList(){
@@ -1145,7 +1362,7 @@ function renderContractors(root, ctx){
   }
 
   root.innerHTML = `
-    <div class="screen con-wrap">
+    <div class="con-wrap">
       <div class="glass">
         <div class="eyebrow">${esc(L.title)}</div>
         <h1 class="h1">${esc(L.title)}</h1>
@@ -1161,6 +1378,10 @@ function renderContractors(root, ctx){
         </div>
         <div class="con-search">
           <input type="search" class="con-search-input" placeholder="${esc(L.searchPh)}" />
+        </div>
+        <div class="con-export-row">
+          <button type="button" class="btn sm con-export-excel">${esc(L.exportExcel)}</button>
+          <button type="button" class="btn sm con-export-pdf">${esc(L.exportPDF)}</button>
         </div>
       </div>
       <div class="con-list stagger"></div>
@@ -1178,11 +1399,12 @@ function renderContractors(root, ctx){
     renderList();
   });
   root.querySelector('.con-fab').addEventListener('click', () => openForm(null));
+  root.querySelector('.con-export-excel').addEventListener('click', doExportExcel);
+  root.querySelector('.con-export-pdf').addEventListener('click', doExportPDF);
 
   refresh();
 }
 
-// ===== module: visitors =====
 // MODULE: Visitors
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_VISITORS = `
@@ -1212,6 +1434,8 @@ const CSS_VISITORS = `
 .vis-actions{ display:flex; gap:10px; margin-top:16px }
 .vis-actions .btn{ flex:1 }
 .vis-quickrow{ display:flex; gap:10px; margin-top:10px }
+.vis-export-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
+.vis-export-row .btn{ flex:none }
 `;
 
 // Mount function — called by the shell router.
@@ -1242,12 +1466,20 @@ function renderVisitors(root, ctx){
     deletedMsg: isAr ? 'تم حذف الزائر' : 'Visitor deleted',
     statusUpdated: isAr ? 'تم تحديث الحالة' : 'Status updated',
     requiredMsg: isAr ? 'الاسم والتاريخ مطلوبان' : 'Name and date are required',
+    exportExcel: isAr ? 'تصدير Excel' : 'Export Excel',
+    exportPDF: isAr ? 'تصدير PDF' : 'Export PDF',
+    colName: isAr ? 'الاسم' : 'Name',
+    colOrg: isAr ? 'الجهة' : 'Organization',
+    colPurpose: isAr ? 'الغرض' : 'Purpose',
+    colVisitDate: isAr ? 'تاريخ الزيارة' : 'Visit Date',
+    colStatus: isAr ? 'الحالة' : 'Status',
+    reportTitle: isAr ? 'تقرير الزوار' : 'Visitors Report',
   };
 
   root.innerHTML = '';
 
   const screen = document.createElement('div');
-  screen.className = 'screen';
+  screen.className = '';
 
   let query = '';
 
@@ -1313,8 +1545,49 @@ function renderVisitors(root, ctx){
         <div class="vis-search">
           <input type="text" id="visSearchInput" placeholder="${L.searchPh}" value="${escapeAttr(query)}" />
         </div>
+        <div class="vis-export-row">
+          <button type="button" class="btn sm" id="visExportExcel">${L.exportExcel}</button>
+          <button type="button" class="btn sm" id="visExportPDF">${L.exportPDF}</button>
+        </div>
       </div>
     `;
+  }
+
+  function statusLabelText(v){ return statusLabel(v.status); }
+
+  function exportRows(){
+    return filtered().map(v => ({
+      [L.colName]: fieldLabel(v, 'name'),
+      [L.colOrg]: v.org || '',
+      [L.colPurpose]: v.purpose || '',
+      [L.colVisitDate]: v.visitDate || '',
+      [L.colStatus]: statusLabelText(v),
+    }));
+  }
+
+  async function doExportExcel(){
+    const blob = GRRK_EXPORT.exportExcel(exportRows(), 'visitors.xlsx', L.title);
+    if(!blob) return;
+    const filename = `GRRK-visitors-${new Date().toISOString().slice(0,10)}.xlsx`;
+    await GRRK_EXPORT.shareFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', L.title, ctx.showToast);
+  }
+
+  async function doExportPDF(){
+    const columns = [
+      {key:'name', label: L.colName},
+      {key:'org', label: L.colOrg},
+      {key:'purpose', label: L.colPurpose},
+      {key:'visitDate', label: L.colVisitDate},
+      {key:'status', label: L.colStatus},
+    ];
+    const rows = filtered().map(v => ({
+      name: fieldLabel(v, 'name'), org: v.org || '', purpose: v.purpose || '',
+      visitDate: v.visitDate || '', status: statusLabelText(v),
+    }));
+    const blob = GRRK_EXPORT.exportPDF(L.reportTitle, columns, rows);
+    if(!blob) return;
+    const filename = `GRRK-visitors-${new Date().toISOString().slice(0,10)}.pdf`;
+    await GRRK_EXPORT.shareFile(blob, filename, 'application/pdf', L.title, ctx.showToast);
   }
 
   function escapeHtml(s){
@@ -1366,6 +1639,10 @@ function renderVisitors(root, ctx){
         attachRowEvents();
       });
     }
+    const exportExcelBtn = screen.querySelector('#visExportExcel');
+    if(exportExcelBtn) exportExcelBtn.addEventListener('click', doExportExcel);
+    const exportPdfBtn = screen.querySelector('#visExportPDF');
+    if(exportPdfBtn) exportPdfBtn.addEventListener('click', doExportPDF);
     attachRowEvents();
   }
 
@@ -1532,7 +1809,6 @@ function renderVisitors(root, ctx){
   root.appendChild(fab);
 }
 
-// ===== module: companies-orgs =====
 // MODULE: CompaniesOrgs
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_COMPANIESORGS = `
@@ -1556,6 +1832,8 @@ const CSS_COMPANIESORGS = `
 .co-actions{ display:flex; gap:10px; margin-top:18px; }
 .co-actions .btn{ flex:1; }
 .co-confirm{ text-align:center; padding:10px 4px; }
+.co-export-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.co-export-row .btn{ flex:none; }
 `;
 
 // Mount function — called by the shell router.
@@ -1591,6 +1869,8 @@ function renderCompaniesOrgs(root, ctx){
     inactiveStatus: isAr ? 'غير نشط' : 'Inactive',
     hero: isAr ? 'الشركات والجهات' : 'Companies & Organizations',
     heroSub: isAr ? 'إدارة الشركاء التجاريين والجهات الحكومية' : 'Manage business partners and government entities',
+    exportExcel: isAr ? 'تصدير Excel' : 'Export Excel',
+    exportPDF: isAr ? 'تصدير PDF' : 'Export PDF',
   };
 
   let state = root.__co_state || { tab: 'companies', q: '' };
@@ -1836,6 +2116,46 @@ function renderCompaniesOrgs(root, ctx){
     });
   }
 
+  function exportColumnsAndRows(){
+    const coll = state.tab === 'companies' ? 'companies' : 'organizations';
+    const all = DB.list(coll).filter(r => matches(r, state.q));
+    if(coll === 'companies'){
+      const cols = [L.nameAr, L.nameEn, L.crNumber, L.sector, L.licenseExpiry, L.status].map(l => ({key:l, label:l}));
+      const rows = all.map(r => ({
+        [L.nameAr]: r.nameAr || '',
+        [L.nameEn]: r.nameEn || '',
+        [L.crNumber]: r.crNumber || '',
+        [L.sector]: r.sector || '',
+        [L.licenseExpiry]: r.licenseExpiry || '',
+        [L.status]: r.status === 'active' ? L.activeStatus : L.inactiveStatus,
+      }));
+      return { cols, rows, filePrefix: 'companies' };
+    }
+    const cols = [L.nameAr, L.nameEn, L.type, L.contactPerson, L.relationship].map(l => ({key:l, label:l}));
+    const rows = all.map(r => ({
+      [L.nameAr]: r.nameAr || '',
+      [L.nameEn]: r.nameEn || '',
+      [L.type]: r.type || '',
+      [L.contactPerson]: r.contactPerson || '',
+      [L.relationship]: r.relationship || '',
+    }));
+    return { cols, rows, filePrefix: 'organizations' };
+  }
+
+  function doExportExcel(){
+    const { rows, filePrefix } = exportColumnsAndRows();
+    const date = new Date().toISOString().slice(0,10);
+    const blob = GRRK_EXPORT.exportExcel(rows, `GRRK-${filePrefix}-${date}.xlsx`, filePrefix);
+    if(blob) GRRK_EXPORT.shareFile(blob, `GRRK-${filePrefix}-${date}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', L.hero, ctx.showToast);
+  }
+
+  function doExportPDF(){
+    const { cols, rows, filePrefix } = exportColumnsAndRows();
+    const date = new Date().toISOString().slice(0,10);
+    const blob = GRRK_EXPORT.exportPDF(filePrefix === 'companies' ? L.companiesTab : L.orgsTab, cols, rows);
+    if(blob) GRRK_EXPORT.shareFile(blob, `GRRK-${filePrefix}-${date}.pdf`, 'application/pdf', L.hero, ctx.showToast);
+  }
+
   function switchTab(tab){
     state.tab = tab;
     root.querySelectorAll('.co-tab').forEach(b => {
@@ -1846,7 +2166,7 @@ function renderCompaniesOrgs(root, ctx){
 
   // ---- Build base markup ----
   root.innerHTML = `
-    <div class="screen">
+    <div>
       <div class="glass">
         <div class="eyebrow">${escapeHtml(t.companies || L.hero)} / ${escapeHtml(t.organizations || L.orgsTab)}</div>
         <h1 class="h1">${escapeHtml(L.hero)}</h1>
@@ -1857,6 +2177,10 @@ function renderCompaniesOrgs(root, ctx){
         </div>
         <div class="co-search">
           <input type="text" placeholder="${escapeHtml(t.search || (isAr?'بحث...':'Search...'))}" value="${escapeHtml(state.q)}">
+        </div>
+        <div class="co-export-row">
+          <button class="btn sm ghost" data-act="export-excel">${escapeHtml(L.exportExcel)}</button>
+          <button class="btn sm ghost" data-act="export-pdf">${escapeHtml(L.exportPDF)}</button>
         </div>
       </div>
       <div class="co-list-wrap">${listHtml()}</div>
@@ -1881,10 +2205,12 @@ function renderCompaniesOrgs(root, ctx){
     openForm(kind, null);
   });
 
+  root.querySelector('[data-act="export-excel"]').addEventListener('click', doExportExcel);
+  root.querySelector('[data-act="export-pdf"]').addEventListener('click', doExportPDF);
+
   bindRowEvents();
 }
 
-// ===== module: documents =====
 // MODULE: Documents
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_DOCUMENTS = `
@@ -1919,6 +2245,8 @@ const CSS_DOCUMENTS = `
 .doc-actions{ display:flex; gap:10px; margin-top:18px }
 .doc-actions .btn{ width:auto; flex:1 }
 .doc-confirm{ text-align:center; padding:10px 4px }
+.doc-export-row{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap }
+.doc-export-row .btn{ width:auto; flex:none }
 `;
 
 // Mount function — called by the shell router.
@@ -1953,6 +2281,76 @@ function renderDocuments(root, ctx){
       }
     }
     return { days, status, pct: Math.round(pct) };
+  }
+
+  function statusLabelPlain(status, days){
+    if(status === 'danger') return tr('منتهي','Expired');
+    if(status === 'warn') return tr('ينتهي قريباً','Expiring soon');
+    if(status === 'ok') return tr('سارٍ','Valid');
+    return '—';
+  }
+
+  function exportRowsFor(docs){
+    return docs.map(({d, meta}) => {
+      const title = isAr ? (d.titleAr || d.titleEn) : (d.titleEn || d.titleAr);
+      return {
+        [tr('التصنيف','Category')]: d.category || '',
+        [tr('العنوان','Title')]: title || '',
+        [tr('الرقم','Number')]: d.number || '',
+        [tr('تاريخ الانتهاء','Expiry Date')]: d.expiryDate || '',
+        [tr('الحالة','Status')]: statusLabelPlain(meta.status, meta.days),
+      };
+    });
+  }
+
+  async function handleBulkExport(kind){
+    const rows = filterAndSort();
+    if(!rows.length){
+      ctx.showToast(tr('لا توجد مستندات للتصدير','No documents to export'));
+      return;
+    }
+    const exportRows = exportRowsFor(rows);
+    const stamp = new Date().toISOString().slice(0,10);
+    if(kind === 'excel'){
+      const blob = GRRK_EXPORT.exportExcel(exportRows, `documents-${stamp}.xlsx`, tr('المستندات','Documents'));
+      if(!blob) return;
+      await GRRK_EXPORT.shareFile(blob, `documents-${stamp}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', tr('تصدير المستندات','Documents export'), ctx.showToast);
+    } else {
+      const columns = [
+        { key: tr('التصنيف','Category'), label: tr('التصنيف','Category') },
+        { key: tr('العنوان','Title'), label: tr('العنوان','Title') },
+        { key: tr('الرقم','Number'), label: tr('الرقم','Number') },
+        { key: tr('تاريخ الانتهاء','Expiry Date'), label: tr('تاريخ الانتهاء','Expiry Date') },
+        { key: tr('الحالة','Status'), label: tr('الحالة','Status') },
+      ];
+      const blob = GRRK_EXPORT.exportPDF(tr('تقرير المستندات','Documents Report'), columns, exportRows);
+      if(!blob) return;
+      await GRRK_EXPORT.shareFile(blob, `documents-${stamp}.pdf`, 'application/pdf', tr('تصدير المستندات','Documents export'), ctx.showToast);
+    }
+  }
+
+  async function handleSingleShare(doc){
+    const meta = computeMeta(doc);
+    const title = isAr ? (doc.titleAr || doc.titleEn) : (doc.titleEn || doc.titleAr);
+    const entityName = DB.entityLabel(doc.entityType, doc.entityId);
+    const columns = [
+      { key: 'label', label: tr('الحقل','Field') },
+      { key: 'value', label: tr('القيمة','Value') },
+    ];
+    const rows = [
+      { label: tr('العنوان','Title'), value: `${doc.titleAr || ''} / ${doc.titleEn || ''}` },
+      { label: tr('الرقم','Number'), value: doc.number || '' },
+      { label: tr('الفئة','Category'), value: doc.category || '' },
+      { label: tr('تاريخ الإصدار','Issue Date'), value: doc.issueDate || '' },
+      { label: tr('تاريخ الانتهاء','Expiry Date'), value: doc.expiryDate || '' },
+      { label: tr('الكيان المرتبط','Linked Entity'), value: entityName || '' },
+      { label: tr('الحالة','Status'), value: statusLabelPlain(meta.status, meta.days) },
+    ];
+    const reportTitle = `${tr('ملخص مستند','Document Summary')} — ${title}`;
+    const blob = GRRK_EXPORT.exportPDF(reportTitle, columns, rows);
+    if(!blob) return;
+    const safeName = (doc.number || doc.id || 'document').toString().replace(/[^a-zA-Z0-9-_]+/g,'_');
+    await GRRK_EXPORT.shareFile(blob, `document-${safeName}.pdf`, 'application/pdf', reportTitle, ctx.showToast);
   }
 
   function statusLabel(status, days){
@@ -2201,6 +2599,7 @@ function renderDocuments(root, ctx){
         <div class="meter" style="margin-bottom:16px"><i style="width:${meta.pct}%; background:${meterColor(meta.status)}"></i></div>
         <div class="doc-actions">
           <button type="button" class="btn ghost" id="doc-detail-close">${t.cancel}</button>
+          <button type="button" class="btn auto" id="doc-detail-share">${tr('مشاركة','Share')}</button>
           <button type="button" class="btn auto" id="doc-detail-edit">${t.edit}</button>
           <button type="button" class="btn danger auto" id="doc-detail-delete">${t.delete}</button>
         </div>
@@ -2208,6 +2607,9 @@ function renderDocuments(root, ctx){
     `;
     ctx.openOverlay(html, (overlayEl) => {
       overlayEl.querySelector('#doc-detail-close').addEventListener('click', () => ctx.closeOverlay());
+      overlayEl.querySelector('#doc-detail-share').addEventListener('click', () => {
+        handleSingleShare(doc);
+      });
       overlayEl.querySelector('#doc-detail-edit').addEventListener('click', () => {
         ctx.closeOverlay();
         openFormOverlay(doc);
@@ -2225,7 +2627,7 @@ function renderDocuments(root, ctx){
     const chips = chipsConfig();
 
     root.innerHTML = `
-      <div class="screen">
+      <div>
         <div class="glass">
           <div class="eyebrow">${t.documents}</div>
           <h1 class="h1">${tr('إدارة المستندات والامتثال','Document & Compliance Management')}</h1>
@@ -2241,6 +2643,10 @@ function renderDocuments(root, ctx){
           </div>
           <div class="doc-search">
             <input type="text" id="doc-search-input" placeholder="${t.search}" value="${escapeHtml(searchQuery)}">
+          </div>
+          <div class="doc-export-row">
+            <button type="button" class="btn sm ghost" id="doc-export-excel">${tr('تصدير Excel','Export Excel')}</button>
+            <button type="button" class="btn sm ghost" id="doc-export-pdf">${tr('تصدير PDF','Export PDF')}</button>
           </div>
         </div>
 
@@ -2284,12 +2690,14 @@ function renderDocuments(root, ctx){
     });
 
     root.querySelector('#doc-fab').addEventListener('click', () => openFormOverlay(null));
+
+    root.querySelector('#doc-export-excel').addEventListener('click', () => handleBulkExport('excel'));
+    root.querySelector('#doc-export-pdf').addEventListener('click', () => handleBulkExport('pdf'));
   }
 
   draw();
 }
 
-// ===== module: alerts =====
 // MODULE: Alerts
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_ALERTS = `
@@ -2636,7 +3044,7 @@ function renderAlerts(root, ctx){
   }
 
   root.innerHTML = `
-    <div class="screen">
+    <div>
       <div class="glass" data-hero></div>
       <div class="alerts-filters" data-filters></div>
       <div data-feed></div>
@@ -2648,7 +3056,6 @@ function renderAlerts(root, ctx){
   renderFeed();
 }
 
-// ===== module: reports =====
 // MODULE: Reports
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_REPORTS = `
@@ -2670,6 +3077,13 @@ const CSS_REPORTS = `
 .rep-top-name{ font-weight:600; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .rep-top-sub{ font-size:12px; color:var(--ink-faint); margin-top:1px }
 .rep-top-count{ font-family:var(--display); font-weight:700; font-size:16px; flex:none }
+.rep-export-card{ margin:16px 0 }
+.rep-export-card h2{ margin-bottom:4px }
+.rep-export-sub{ color:var(--ink-faint); font-size:12.5px; margin-bottom:14px }
+.rep-export-actions{ display:flex; flex-wrap:wrap; gap:10px }
+.rep-export-actions .btn{ flex:1 1 150px; display:flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap }
+.rep-export-actions .btn svg{ width:16px; height:16px; flex:none }
+@media (max-width:420px){ .rep-export-actions{ flex-direction:column } .rep-export-actions .btn{ flex:1 1 auto } }
 `;
 
 // Mount function — called by the shell router.
@@ -2733,6 +3147,47 @@ function renderReports(root, ctx){
       return { entityType, entityId, count, label: DB.entityLabel(entityType, entityId) };
     });
 
+  // ---- Export & Share: unified row set across all tracked collections ----
+  const statusLabelOf = (ds) => ({
+    ok: L('ساري','OK'),
+    warn: L('قريب الانتهاء','Expiring soon'),
+    danger: L('منتهي','Expired'),
+    neutral: '—'
+  }[expiryStatus(ds)]);
+
+  const exportRows = []
+    .concat(documents.map(d => ({
+      type: L('مستند','Document'),
+      name: (isAr ? d.titleAr : (d.titleEn || d.titleAr)) || '—',
+      category: d.category || '—',
+      expiry: d.expiryDate || '—',
+      status: statusLabelOf(d.expiryDate)
+    })))
+    .concat(employees.map(e => ({
+      type: L('موظف','Employee'),
+      name: (isAr ? e.nameAr : (e.nameEn || e.nameAr)) || '—',
+      category: e.dept || '—',
+      expiry: e.idExpiry || '—',
+      status: statusLabelOf(e.idExpiry)
+    })))
+    .concat(contractors.map(c => ({
+      type: L('مقاول','Contractor'),
+      name: (isAr ? c.nameAr : (c.nameEn || c.nameAr)) || '—',
+      category: c.service || '—',
+      expiry: c.contractEnd || '—',
+      status: statusLabelOf(c.contractEnd)
+    })))
+    .concat(companies.map(c => ({
+      type: L('شركة','Company'),
+      name: (isAr ? c.nameAr : (c.nameEn || c.nameAr)) || '—',
+      category: c.sector || '—',
+      expiry: c.licenseExpiry || '—',
+      status: statusLabelOf(c.licenseExpiry)
+    })));
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const exportTitle = L('تقرير GRRK','GRRK Report');
+
   const entityTypeLabel = (type) => ({
     employee: L('موظف','Employee'),
     contractor: L('مقاول','Contractor'),
@@ -2789,37 +3244,60 @@ function renderReports(root, ctx){
     </svg>`;
 
   root.innerHTML = `
-    <div class="screen">
-      <div class="glass">
-        <div class="eyebrow">${L('نظرة عامة تنفيذية','Executive Overview')}</div>
-        <h1>${totalRecords}<span style="font-size:.5em; color:var(--ink-soft); font-weight:500"> ${L('سجل إجمالي','total records')}</span></h1>
-        <p class="muted" style="margin-top:8px">
-          ${L('مؤشر سلامة الامتثال العام','Overall compliance health')}:
-          <strong style="color:${healthPct >= 80 ? 'var(--ok)' : healthPct >= 50 ? 'var(--warn)' : 'var(--danger)'}" class="num">${healthPct}%</strong>
-          ${L(`من ${trackedDates.length} تاريخ انتهاء متتبع لم يمر موعده بعد`, `of ${trackedDates.length} tracked expiry dates not yet past`)}
-        </p>
+    <div>
+      <div id="repSnapshotArea">
+        <div class="glass">
+          <div class="eyebrow">${L('نظرة عامة تنفيذية','Executive Overview')}</div>
+          <h1>${totalRecords}<span style="font-size:.5em; color:var(--ink-soft); font-weight:500"> ${L('سجل إجمالي','total records')}</span></h1>
+          <p class="muted" style="margin-top:8px">
+            ${L('مؤشر سلامة الامتثال العام','Overall compliance health')}:
+            <strong style="color:${healthPct >= 80 ? 'var(--ok)' : healthPct >= 50 ? 'var(--warn)' : 'var(--danger)'}" class="num">${healthPct}%</strong>
+            ${L(`من ${trackedDates.length} تاريخ انتهاء متتبع لم يمر موعده بعد`, `of ${trackedDates.length} tracked expiry dates not yet past`)}
+          </p>
+        </div>
+
+        <div class="rep-grid stagger">
+          <div class="stat">
+            <div class="val num">${docCategories.length}</div>
+            <div class="lbl">${L('فئات المستندات','Document categories')}</div>
+            <div class="faint" style="margin-top:4px">${documents.length} ${L('مستند بإجمالي','total documents')}</div>
+          </div>
+          <div class="stat">
+            <div class="val num">${empDepts.length}</div>
+            <div class="lbl">${L('إدارات الموظفين','Employee departments')}</div>
+            <div class="faint" style="margin-top:4px">${employees.length} ${L('موظف','employees')}</div>
+          </div>
+          <div class="stat">
+            <div class="val num">${activeContractors}</div>
+            <div class="lbl">${L('مقاولون نشطون','Active contractors')}</div>
+            <div class="faint" style="margin-top:4px">${contractors.length} ${L('إجمالي المقاولين','total contractors')}</div>
+          </div>
+          <div class="stat">
+            <div class="val num">${companySectors.length}</div>
+            <div class="lbl">${L('قطاعات الشركات','Company sectors')}</div>
+            <div class="faint" style="margin-top:4px">${companies.length} ${L('شركة','companies')}</div>
+          </div>
+        </div>
       </div>
 
-      <div class="rep-grid stagger">
-        <div class="stat">
-          <div class="val num">${docCategories.length}</div>
-          <div class="lbl">${L('فئات المستندات','Document categories')}</div>
-          <div class="faint" style="margin-top:4px">${documents.length} ${L('مستند بإجمالي','total documents')}</div>
-        </div>
-        <div class="stat">
-          <div class="val num">${empDepts.length}</div>
-          <div class="lbl">${L('إدارات الموظفين','Employee departments')}</div>
-          <div class="faint" style="margin-top:4px">${employees.length} ${L('موظف','employees')}</div>
-        </div>
-        <div class="stat">
-          <div class="val num">${activeContractors}</div>
-          <div class="lbl">${L('مقاولون نشطون','Active contractors')}</div>
-          <div class="faint" style="margin-top:4px">${contractors.length} ${L('إجمالي المقاولين','total contractors')}</div>
-        </div>
-        <div class="stat">
-          <div class="val num">${companySectors.length}</div>
-          <div class="lbl">${L('قطاعات الشركات','Company sectors')}</div>
-          <div class="faint" style="margin-top:4px">${companies.length} ${L('شركة','companies')}</div>
+      <div class="rep-section rep-export-card">
+        <h2>${L('تصدير ومشاركة','Export & Share')}</h2>
+        <div class="card">
+          <div class="rep-export-sub">${L('صدّر لقطة كاملة من حالة الامتثال عبر كل السجلات المتتبعة','Export a full snapshot of compliance status across all tracked records')}</div>
+          <div class="rep-export-actions">
+            <button type="button" class="btn" id="repExportExcelBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
+              ${L('تصدير Excel','Export Excel')}
+            </button>
+            <button type="button" class="btn" id="repExportPdfBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v3h3"/><path d="M8.5 13h2M8.5 16h2.5M13.5 13h2v3h-2z"/></svg>
+              ${L('تصدير PDF','Export PDF')}
+            </button>
+            <button type="button" class="btn" id="repExportImageBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg>
+              ${L('مشاركة كصورة','Share as image')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2861,6 +3339,45 @@ function renderReports(root, ctx){
       </div>
     </div>
   `;
+
+  // ---- Export & Share wiring ----
+  const excelBtn = root.querySelector('#repExportExcelBtn');
+  const pdfBtn = root.querySelector('#repExportPdfBtn');
+  const imageBtn = root.querySelector('#repExportImageBtn');
+
+  if(excelBtn) excelBtn.addEventListener('click', () => {
+    const filename = `GRRK-report-${todayStr}.xlsx`;
+    const excelRows = exportRows.map(r => ({
+      [L('النوع','Type')]: r.type,
+      [L('الاسم','Name')]: r.name,
+      [L('الفئة','Category')]: r.category,
+      [L('تاريخ الانتهاء','Expiry Date')]: r.expiry,
+      [L('الحالة','Status')]: r.status
+    }));
+    const blob = GRRK_EXPORT.exportExcel(excelRows, filename, L('التقرير','Report'));
+    if(blob) GRRK_EXPORT.shareFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', exportTitle, ctx.showToast);
+  });
+
+  if(pdfBtn) pdfBtn.addEventListener('click', () => {
+    const filename = `GRRK-report-${todayStr}.pdf`;
+    const columns = [
+      { key:'type', label: L('النوع','Type') },
+      { key:'name', label: L('الاسم','Name') },
+      { key:'category', label: L('الفئة','Category') },
+      { key:'expiry', label: L('تاريخ الانتهاء','Expiry Date') },
+      { key:'status', label: L('الحالة','Status') }
+    ];
+    const blob = GRRK_EXPORT.exportPDF(exportTitle, columns, exportRows);
+    if(blob) GRRK_EXPORT.shareFile(blob, filename, 'application/pdf', exportTitle, ctx.showToast);
+  });
+
+  if(imageBtn) imageBtn.addEventListener('click', async () => {
+    const snapEl = root.querySelector('#repSnapshotArea');
+    if(!snapEl) return;
+    const filename = `GRRK-report-${todayStr}.png`;
+    const blob = await GRRK_EXPORT.exportImage(snapEl);
+    if(blob) GRRK_EXPORT.shareFile(blob, filename, 'image/png', exportTitle, ctx.showToast);
+  });
 }
 
 function repsEscapeHtml(str){
@@ -2871,7 +3388,6 @@ function repsEscapeHtml(str){
     .replace(/"/g, '&quot;');
 }
 
-// ===== module: settings =====
 // MODULE: Settings
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_SETTINGS = `
@@ -2911,7 +3427,7 @@ function renderSettings(root, ctx){
   ];
 
   const screen = document.createElement('div');
-  screen.className = 'screen';
+  screen.className = '';
 
   screen.innerHTML = `
     <div class="glass" style="margin-bottom:16px">
@@ -3068,7 +3584,6 @@ function renderSettings(root, ctx){
   });
 }
 
-// ===== module: profile =====
 // MODULE: Profile (Entity Profile — full-page 360° deep-detail view)
 //
 // ⚠️ SIGNATURE DEVIATION FROM CONTRACT: this module's mount function takes an
@@ -3185,7 +3700,7 @@ function renderProfile(root, ctx, target){
   const isAr = lang === 'ar';
 
   const wrap = document.createElement('div');
-  wrap.className = 'screen';
+  wrap.className = '';
 
   // -------- guard: no target / missing entity --------
   const entityType = target && target.entityType;
@@ -3243,7 +3758,12 @@ function renderProfile(root, ctx, target){
     let displayVal;
     if (kind === 'status'){
       const sOk = raw === 'active' || raw === 'scheduled';
-      displayVal = `<span class="badge ${sOk?'ok':'neutral'}">${profileEsc(raw || '—')}</span>`;
+      const STATUS_LABELS = {
+        active:{ar:'نشط',en:'Active'}, inactive:{ar:'غير نشط',en:'Inactive'},
+        scheduled:{ar:'مجدول',en:'Scheduled'}, completed:{ar:'مكتمل',en:'Completed'}, cancelled:{ar:'ملغى',en:'Cancelled'},
+      };
+      const sLabel = STATUS_LABELS[raw] ? (isAr ? STATUS_LABELS[raw].ar : STATUS_LABELS[raw].en) : (raw || '—');
+      displayVal = `<span class="badge ${sOk?'ok':'neutral'}">${profileEsc(sLabel)}</span>`;
     } else if (kind === 'phone'){
       displayVal = `<span class="v ltr" style="direction:ltr">${profileEsc(raw || '—')}</span>`;
     } else {
@@ -3391,7 +3911,6 @@ function renderProfile(root, ctx, target){
   });
 }
 
-// ===== module: library =====
 // MODULE: Library
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_LIBRARY = `
@@ -3432,6 +3951,12 @@ const CSS_LIBRARY = `
 .lib-upload-box{ margin-top:10px; padding:14px; border-radius:13px; background:var(--flat); border:1px dashed var(--flat-line) }
 .lib-form-row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
 .lib-confirm-icon{ width:52px; height:52px; border-radius:50%; background:rgba(255,107,129,.14); color:var(--danger); display:grid; place-items:center; margin:0 auto 14px }
+.lib-actions.lib-actions-3{ flex-wrap:wrap }
+.lib-actions.lib-actions-3 .btn{ flex:1 1 30%; min-width:100px }
+.lib-share-note{ font-size:12px; color:var(--ink-faint); margin-top:8px; text-align:center }
+#lib-detail-share{ display:flex; align-items:center; justify-content:center; gap:6px }
+#lib-detail-share svg{ width:16px; height:16px; flex:none }
+#lib-detail-share[disabled]{ opacity:.45; cursor:not-allowed }
 `;
 
 // Mount function — called by the shell router.
@@ -3453,6 +3978,7 @@ function renderLibrary(root, ctx){
       trash: '<path d="M4 7h16M9 7V4h6v3m-7 0l1 13h8l1-13"/>',
       caret: '<path d="M9 6l6 6-6 6"/>',
       warn: '<path d="M12 9v4"/><circle cx="12" cy="16" r="0.6" fill="currentColor"/><path d="M10.3 4.3L2.8 18a1 1 0 0 0 .9 1.5h16.6a1 1 0 0 0 .9-1.5L13.7 4.3a1 1 0 0 0-1.8 0z"/>',
+      share: '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.7l7.4-4.2M8.3 13.3l7.4 4.2"/>',
     };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[name]||''}</svg>`;
   }
@@ -3575,7 +4101,7 @@ function renderLibrary(root, ctx){
     const cats = categories();
 
     root.innerHTML = `
-      <div class="screen">
+      <div>
         <div class="glass">
           <div class="lib-hero-row">
             <div>
@@ -3658,16 +4184,58 @@ function renderLibrary(root, ctx){
             ${L ? (notesAr ? `<b>${tr('ملاحظات','Notes')}</b>${escapeHtml(notesAr)}` : (notesEn?`<b>${tr('ملاحظات','Notes')}</b>${escapeHtml(notesEn)}`:'')) :
                   (notesEn ? `<b>Notes</b>${escapeHtml(notesEn)}` : (notesAr?`<b>Notes</b>${escapeHtml(notesAr)}`:''))}
           </div>` : ''}
-        <div class="lib-actions">
+        <div class="lib-actions lib-actions-3">
+          <button class="btn ghost" id="lib-detail-share" ${!item.src ? 'disabled' : ''}>${icon('share')} ${tr('مشاركة','Share')}</button>
           <button class="btn ghost" id="lib-detail-edit">${ctx.t.edit || tr('تعديل','Edit')}</button>
           <button class="btn danger" id="lib-detail-delete">${ctx.t.delete || tr('حذف','Delete')}</button>
         </div>
+        ${!item.src ? `<div class="lib-share-note">${tr('لا يوجد ملف أو رابط لمشاركته.','Nothing attached yet to share.')}</div>` : ''}
       </div>
     `;
     ctx.openOverlay(html, () => {
       root.querySelector('#lib-detail-edit')?.addEventListener('click', () => { ctx.closeOverlay(); openForm(item); });
       root.querySelector('#lib-detail-delete')?.addEventListener('click', () => { confirmDelete(item); });
+      const shareBtn = root.querySelector('#lib-detail-share');
+      if(shareBtn && item.src){
+        shareBtn.addEventListener('click', () => shareItem(item));
+      }
     });
+  }
+
+  // ---------- Share ----------
+  // Guesses a file extension from a data: URL's mime type (header before the comma).
+  function extFromMime(mime){
+    const map = {
+      'audio/mpeg':'mp3', 'audio/mp3':'mp3', 'audio/wav':'wav', 'audio/x-wav':'wav',
+      'audio/mp4':'m4a', 'audio/aac':'aac', 'audio/ogg':'ogg', 'audio/flac':'flac', 'audio/webm':'weba',
+      'video/mp4':'mp4', 'video/webm':'webm', 'video/quicktime':'mov', 'video/x-m4v':'m4v'
+    };
+    return map[mime] || (mime && mime.startsWith('video') ? 'mp4' : 'mp3');
+  }
+
+  async function shareItem(item){
+    const title = L ? (item.titleAr || item.titleEn) : (item.titleEn || item.titleAr);
+    const src = item.src || '';
+    if(!src){ ctx.showToast(tr('لا يوجد شيء لمشاركته.','Nothing to share.')); return; }
+
+    if(src.startsWith('data:')){
+      // A real local file we hold in memory — share the actual bytes.
+      try{
+        const res = await fetch(src);
+        const blob = await res.blob();
+        const mime = blob.type || (item.mediaType === 'video' ? 'video/mp4' : 'audio/mpeg');
+        const ext = extFromMime(mime);
+        const safeName = (title || (item.mediaType === 'video' ? tr('مقطع فيديو','clip') : tr('مقطع صوتي','clip'))).replace(/[^\w؀-ۿ\- ]+/g, '').trim() || 'clip';
+        const filename = `${safeName}.${ext}`;
+        await GRRK_EXPORT.shareFile(blob, filename, mime, title || filename, ctx.showToast);
+      }catch(e){
+        ctx.showToast(tr('تعذرت مشاركة الملف.','Could not share the file.'));
+      }
+    } else {
+      // External URL (YouTube / Drive / direct link) — we can only share the link itself,
+      // a static page cannot fetch and re-attach arbitrary cross-origin bytes.
+      await GRRK_EXPORT.shareText(src, title || src, ctx.showToast);
+    }
   }
 
   function confirmDelete(item){
@@ -3829,7 +4397,6 @@ function renderLibrary(root, ctx){
   paint();
 }
 
-// ===== module: forms =====
 // MODULE: Forms
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_FORMS = `
@@ -3868,6 +4435,8 @@ const CSS_FORMS = `
 .forms-confirm-icon{ width:52px; height:52px; margin:0 auto 14px; border-radius:16px; display:grid; place-items:center;
   background:rgba(255,107,129,.14); color:var(--danger) }
 .forms-confirm-icon svg{ width:26px; height:26px }
+.forms-export-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
+.forms-export-row .btn{ flex:none }
 `;
 
 // Mount function — called by the shell router.
@@ -3912,6 +4481,11 @@ function renderForms(root, ctx){
     deletedToast: isAr ? 'تم حذف النموذج' : 'Form deleted',
     noDesc: isAr ? 'لا يوجد وصف لهذا النموذج.' : 'No description provided for this form.',
     validation: isAr ? 'يرجى إدخال العنوان بالعربي والإنجليزي على الأقل' : 'Please enter at least the Arabic and English title',
+    exportExcel: isAr ? 'تصدير Excel' : 'Export Excel',
+    exportPDF: isAr ? 'تصدير PDF' : 'Export PDF',
+    shareLink: isAr ? 'مشاركة الرابط' : 'Share link',
+    colTitle: isAr ? 'العنوان' : 'Title',
+    colCategory: isAr ? 'التصنيف' : 'Category',
   };
 
   let search = '';
@@ -3974,13 +4548,36 @@ function renderForms(root, ctx){
     return pairs[idx % pairs.length];
   }
 
+  function exportRows(){
+    return filtered().map(f=>({
+      [L.colTitle]: titleOf(f),
+      [L.colCategory]: catOf(f),
+      [L.updated]: f.updatedDate || '',
+    }));
+  }
+
+  function doExportExcel(){
+    const rows = exportRows();
+    const date = new Date().toISOString().slice(0,10);
+    const blob = GRRK_EXPORT.exportExcel(rows, `GRRK-forms-${date}.xlsx`, 'forms');
+    if(blob) GRRK_EXPORT.shareFile(blob, `GRRK-forms-${date}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', L.title, ctx.showToast);
+  }
+
+  function doExportPDF(){
+    const rows = exportRows();
+    const cols = [L.colTitle, L.colCategory, L.updated].map(l=>({key:l,label:l}));
+    const date = new Date().toISOString().slice(0,10);
+    const blob = GRRK_EXPORT.exportPDF(L.title, cols, rows);
+    if(blob) GRRK_EXPORT.shareFile(blob, `GRRK-forms-${date}.pdf`, 'application/pdf', L.title, ctx.showToast);
+  }
+
   function paint(){
     const items = getItems();
     const cats = getCategories(items);
     const list = filtered();
 
     root.innerHTML = `
-      <div class="screen">
+      <div>
         <div class="glass">
           <div class="forms-hero-row">
             <div>
@@ -3991,6 +4588,10 @@ function renderForms(root, ctx){
           </div>
           <div class="field forms-search" style="margin-bottom:0">
             <input type="text" id="forms-search-input" placeholder="${esc(L.searchPh)}" value="${esc(search)}" />
+          </div>
+          <div class="forms-export-row">
+            <button type="button" class="btn sm ghost" id="forms-export-excel">${esc(L.exportExcel)}</button>
+            <button type="button" class="btn sm ghost" id="forms-export-pdf">${esc(L.exportPDF)}</button>
           </div>
         </div>
 
@@ -4045,6 +4646,9 @@ function renderForms(root, ctx){
 
     root.querySelector('#forms-fab').addEventListener('click', ()=> openEditor(null));
 
+    root.querySelector('#forms-export-excel').addEventListener('click', doExportExcel);
+    root.querySelector('#forms-export-pdf').addEventListener('click', doExportPDF);
+
     function paintPreserveFocus(){
       const pos = searchInput.selectionStart;
       paint();
@@ -4072,7 +4676,8 @@ function renderForms(root, ctx){
         <div class="forms-detail-desc">${esc(descOf(f)) || `<span class="faint">${esc(L.noDesc)}</span>`}</div>
 
         ${hasLink
-          ? `<button class="btn primary" id="forms-open-btn">${iconOpen()} ${esc(L.openForm)}</button>`
+          ? `<button class="btn primary" id="forms-open-btn">${iconOpen()} ${esc(L.openForm)}</button>
+             <button class="btn ghost" id="forms-share-btn" style="margin-top:10px; width:100%">${esc(L.shareLink)}</button>`
           : `<button class="btn primary" disabled style="opacity:.45; cursor:not-allowed">${iconOpen()} ${esc(L.openForm)}</button>
              <div class="forms-nolink-note">${esc(L.noLink)}</div>`
         }
@@ -4089,6 +4694,10 @@ function renderForms(root, ctx){
         openBtn.addEventListener('click', ()=>{
           window.open(f.fileUrl, '_blank');
         });
+      }
+      const shareBtn = overlayRoot.querySelector('#forms-share-btn');
+      if(shareBtn){
+        shareBtn.addEventListener('click', ()=>GRRK_EXPORT.shareText(f.fileUrl, titleOf(f), ctx.showToast));
       }
       overlayRoot.querySelector('#forms-edit-btn').addEventListener('click', ()=>{
         ctx.closeOverlay();
@@ -4200,7 +4809,6 @@ function renderForms(root, ctx){
   paint();
 }
 
-// ===== module: archive =====
 // MODULE: Archive
 // EXTRA CSS (scoped, prefixed) — will be inlined into the shared <style>
 const CSS_ARCHIVE = `
@@ -4225,6 +4833,8 @@ const CSS_ARCHIVE = `
 .archive-hint{ font-size:12px; color:var(--ink-faint); margin-top:4px }
 .archive-detail-notes{ white-space:pre-wrap; font-size:14px; line-height:1.7; color:var(--ink); margin-top:4px }
 .archive-confirm{ text-align:center; padding:6px 2px 2px }
+.archive-export-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
+.archive-export-row .btn{ flex:none }
 `;
 
 // Mount function — called by the shell router.
@@ -4278,6 +4888,35 @@ function renderArchive(root, ctx){
     return items;
   }
 
+  function exportRows(){
+    const cats = DB.list('archiveCategories');
+    const items = getItems();
+    return items.map(it=>{
+      const cat = cats.find(c=>c.id===it.categoryId);
+      const title = isAr ? (it.titleAr||it.titleEn) : (it.titleEn||it.titleAr);
+      return {
+        [label('العنوان','Title')]: title || '',
+        [label('التصنيف','Category')]: catName(cat),
+        [label('التاريخ','Date')]: it.dateAr || '',
+      };
+    });
+  }
+
+  function doExportExcel(){
+    const rows = exportRows();
+    const date = new Date().toISOString().slice(0,10);
+    const blob = GRRK_EXPORT.exportExcel(rows, `GRRK-archive-${date}.xlsx`, 'archive');
+    if(blob) GRRK_EXPORT.shareFile(blob, `GRRK-archive-${date}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', label('الأرشيف','Archive'), ctx.showToast);
+  }
+
+  function doExportPDF(){
+    const rows = exportRows();
+    const cols = [label('العنوان','Title'), label('التصنيف','Category'), label('التاريخ','Date')].map(l=>({key:l,label:l}));
+    const date = new Date().toISOString().slice(0,10);
+    const blob = GRRK_EXPORT.exportPDF(label('الأرشيف','Archive'), cols, rows);
+    if(blob) GRRK_EXPORT.shareFile(blob, `GRRK-archive-${date}.pdf`, 'application/pdf', label('الأرشيف','Archive'), ctx.showToast);
+  }
+
   function paint(){
     const cats = DB.list('archiveCategories');
     const allItems = DB.list('archiveItems');
@@ -4318,7 +4957,7 @@ function renderArchive(root, ctx){
     `;
 
     root.innerHTML = `
-      <div class="screen">
+      <div>
         <div class="glass">
           <div class="eyebrow">${label('الأرشيف','Archive')}</div>
           <div style="display:flex; gap:22px; margin-top:10px; flex-wrap:wrap">
@@ -4333,6 +4972,10 @@ function renderArchive(root, ctx){
           </div>
           <div class="field" style="margin-top:16px; margin-bottom:0">
             <input type="text" id="arch-search" placeholder="${label('بحث بالعنوان...','Search by title...')}" value="${esc(searchQ)}" />
+          </div>
+          <div class="archive-export-row">
+            <button class="btn sm ghost" id="arch-export-excel">${label('تصدير Excel','Export Excel')}</button>
+            <button class="btn sm ghost" id="arch-export-pdf">${label('تصدير PDF','Export PDF')}</button>
           </div>
         </div>
 
@@ -4355,6 +4998,8 @@ function renderArchive(root, ctx){
       el.addEventListener('click', ()=>{ activeCat = el.getAttribute('data-cat'); paint(); });
     });
 
+    root.querySelector('#arch-export-excel').addEventListener('click', doExportExcel);
+    root.querySelector('#arch-export-pdf').addEventListener('click', doExportPDF);
     root.querySelector('#arch-add-cat').addEventListener('click', openAddCategorySheet);
     root.querySelector('#arch-manage-cats').addEventListener('click', openManageCategoriesSheet);
     root.querySelector('#arch-fab').addEventListener('click', ()=>openItemForm(null));
@@ -4598,6 +5243,7 @@ function renderArchive(root, ctx){
         ${it.dateAr ? `<div class="faint" style="margin-top:14px">${label('التاريخ','Date')}: <span class="num">${esc(it.dateAr)}</span></div>` : ''}
         ${notes ? `<div class="archive-detail-notes">${esc(notes)}</div>` : `<p class="faint" style="margin-top:14px">${label('لا توجد ملاحظات','No notes')}</p>`}
         ${it.fileUrl ? `<button class="btn auto" id="it-open-file" style="margin-top:16px; width:100%">${iconFile()} ${label('فتح الملف','Open file')}</button>` : ''}
+        ${it.fileUrl ? `<button class="btn ghost" id="it-share-file" style="margin-top:10px; width:100%">${label('مشاركة الرابط','Share link')}</button>` : ''}
         <div class="divider"></div>
         <div style="display:flex; gap:10px">
           <button class="btn ghost" id="it-edit-btn">${t.edit}</button>
@@ -4608,6 +5254,8 @@ function renderArchive(root, ctx){
     ctx.openOverlay(html, (ov)=>{
       const fileBtn = ov.querySelector('#it-open-file');
       if(fileBtn) fileBtn.addEventListener('click', ()=>window.open(it.fileUrl, '_blank'));
+      const shareBtn = ov.querySelector('#it-share-file');
+      if(shareBtn) shareBtn.addEventListener('click', ()=>GRRK_EXPORT.shareText(it.fileUrl, title, ctx.showToast));
       ov.querySelector('#it-edit-btn').addEventListener('click', ()=>openItemForm(it));
       ov.querySelector('#it-del-btn').addEventListener('click', ()=>confirmDeleteItem(it, ov));
     });
@@ -4941,6 +5589,7 @@ function renderArchive(root, ctx){
   }
   boot();
 })();
-  </script>
+
+</script>
 </body>
 </html>

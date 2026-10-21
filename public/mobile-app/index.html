@@ -215,15 +215,18 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .icon3d.sm{ width:36px; height:36px; border-radius:12px }
 .icon3d svg{ width:24px; height:24px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)) }
 .icon3d.sm svg{ width:19px; height:19px }
-/* Quick glossy shine confined to the icon tile itself (not the whole
-   screen) — a short, subtle flash rather than the old full-card sweep. */
+/* Glossy shine confined to the icon tile itself (not the whole screen),
+   and — instead of every icon shimmering together — only ONE icon on the
+   page lights up at a time, in a slow relay from icon to icon. The relay
+   itself is driven by shell.js toggling .chase-on on one .icon3d at a
+   time; this is just the per-icon sweep that plays while that class is on. */
 .icon3d::after{
   content:''; position:absolute; top:0; bottom:0; width:40%; left:-60%;
   background:linear-gradient(100deg, transparent, var(--shimmer), transparent);
-  opacity:.22; animation:icon-sweep 1.5s ease-in-out infinite;
-  pointer-events:none;
+  opacity:0; pointer-events:none;
 }
-@keyframes icon-sweep{ 0%{left:-60%} 45%{left:120%} 100%{left:120%} }
+.icon3d.chase-on::after{ opacity:.22; animation:icon-sweep 1.8s ease-in-out 1 both; }
+@keyframes icon-sweep{ 0%{left:-60%} 100%{left:120%} }
 
 /* ---------- KPI stat tile ---------- */
 .stat{ position:relative; padding:18px 16px; border-radius:18px; background:var(--flat); border:1px solid var(--flat-line); overflow:hidden; box-shadow:0 10px 22px -16px var(--glow-tint) }
@@ -364,7 +367,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-21T21:51:34Z', dmy: '22/10/2026', hm: '00:51' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-21T21:57:56Z', dmy: '22/10/2026', hm: '00:57' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5961,6 +5964,24 @@ function renderArchive(root, ctx){
     document.head.appendChild(styleEl);
   }
 
+  // ---------------- Icon "chase" shimmer ----------------
+  // Instead of every icon tile shimmering at once, only one icon on the
+  // whole page lights up at a time, in a slow relay from one icon to the
+  // next. Re-samples the DOM on every tick (cheap) so it stays correct
+  // across screen navigation without any render-function coordination.
+  let chaseIdx = 0;
+  function tickIconChase(){
+    document.querySelectorAll('.icon3d.chase-on').forEach(el => el.classList.remove('chase-on'));
+    const icons = document.querySelectorAll('.icon3d');
+    if(icons.length === 0) return;
+    // Force a reflow so the next chase-on is always treated as a fresh
+    // animation start, even when it lands on the very same icon again.
+    void document.body.offsetWidth;
+    chaseIdx = chaseIdx % icons.length;
+    icons[chaseIdx].classList.add('chase-on');
+    chaseIdx++;
+  }
+
   // ---------------- Boot ----------------
   function boot(){
     applyDocAttrs();
@@ -5971,6 +5992,8 @@ function renderArchive(root, ctx){
     renderNav();
     renderScreen('dashboard', true);
     renderInstallBanner();
+    tickIconChase();
+    setInterval(tickIconChase, 2600); // extremely slow, deliberate icon-by-icon relay
   }
   boot();
 })();

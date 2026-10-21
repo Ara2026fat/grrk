@@ -44,7 +44,7 @@
   --ok:#52E3A6; --warn:#FFC168; --danger:#FF6B81;
   --btn-bg:rgba(79,114,224,.2); --btn-line:rgba(79,114,224,.4); --btn-ink:#C3D1FA;
   --shimmer:rgba(255,255,255,.5);
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(79,114,224,.17), transparent 70%), var(--void);
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(79,114,224,.34), transparent 72%), var(--void);
   --icon-hl:rgba(255,255,255,.5); /* glossy highlight baked into every icon3d tile */
 }
 [data-theme="day"]{
@@ -74,7 +74,7 @@
 :root[data-theme="night"][data-accent="forest"]{
   --glow:#1F9E63; --glow-tint:rgba(31,158,99,.18);
   --btn-bg:rgba(31,158,99,.2); --btn-line:rgba(31,158,99,.4); --btn-ink:#B7F0D3;
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(31,158,99,.16), transparent 70%), var(--void);
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(31,158,99,.32), transparent 72%), var(--void);
 }
 :root[data-theme="day"][data-accent="forest"]{
   --glow:#146B45; --glow-tint:rgba(20,107,69,.16);
@@ -85,7 +85,7 @@
 :root[data-theme="night"][data-accent="graphite"]{
   --glow:#8792A6; --glow-tint:rgba(135,146,166,.18);
   --btn-bg:rgba(135,146,166,.2); --btn-line:rgba(135,146,166,.4); --btn-ink:#D7DBE4;
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(135,146,166,.15), transparent 70%), var(--void);
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(135,146,166,.3), transparent 72%), var(--void);
 }
 :root[data-theme="day"][data-accent="graphite"]{
   --glow:#444E5E; --glow-tint:rgba(68,78,94,.16);
@@ -96,7 +96,7 @@
 :root[data-theme="night"][data-accent="amber"]{
   --glow:#F0B93C; --glow-tint:rgba(240,185,60,.2);
   --btn-bg:rgba(240,185,60,.22); --btn-line:rgba(240,185,60,.44); --btn-ink:#FBE4A3;
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(240,185,60,.18), transparent 70%), var(--void);
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(240,185,60,.36), transparent 72%), var(--void);
 }
 :root[data-theme="day"][data-accent="amber"]{
   --glow:#9C6B12; --glow-tint:rgba(156,107,18,.18);
@@ -113,11 +113,16 @@ html,body{height:100%}
    whatever was next. */
 html{ overflow-anchor:none; }
 body{
-  background:var(--app-bg); color:var(--ink); font-family:var(--body);
+  background:var(--app-bg); background-attachment:fixed; color:var(--ink); font-family:var(--body);
   line-height:1.6; -webkit-tap-highlight-color:transparent;
   overscroll-behavior-y:none; min-height:100vh;
   transition:background var(--dur-slow) var(--ease), color var(--dur-slow) var(--ease);
 }
+/* background-attachment:fixed pins the accent-colored glow to the viewport
+   (not the document), so it stays visible behind every screen regardless of
+   how tall the content is or how far the person has scrolled — otherwise
+   the gradient (anchored near the top of the document) scrolls out of view
+   on any screen taller than one viewport and the accent reads as "gone". */
 [dir="rtl"] body{font-family:'Tajawal','Space Grotesk',sans-serif}
 button, input, textarea, select{font-family:inherit}
 .font-variant-tabular, .num{font-variant-numeric:tabular-nums}
@@ -135,13 +140,11 @@ button, input, textarea, select{font-family:inherit}
   background:linear-gradient(90deg,transparent,var(--glow),transparent);
   opacity:.55;
 }
-.glass::after{ /* slow shimmer sweep for the "hero" surface */
-  content:''; position:absolute; top:0; bottom:0; width:40%; left:-60%;
-  background:linear-gradient(100deg, transparent, var(--shimmer), transparent);
-  opacity:.06; animation:sweep 7s ease-in-out infinite;
-  pointer-events:none;
-}
-@keyframes sweep{ 0%{left:-60%} 45%{left:120%} 100%{left:120%} }
+/* The old full-card shimmer sweep (a slow light sweeping across the ENTIRE
+   hero card) read as a scanner/printhead pass over the whole screen rather
+   than a glossy accent — removed from .glass. The shine now lives only on
+   the small app/section icon tiles (.icon3d), see below, where a quick
+   glossy flash actually looks premium instead of a full-screen gimmick. */
 
 .card, .flat{
   background:var(--flat); border:1px solid var(--flat-line);
@@ -201,14 +204,23 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 
 /* ---------- 3D glow icon tiles ---------- */
 .icon3d{
-  width:46px; height:46px; border-radius:16px; display:grid; place-items:center; flex:none;
+  width:52px; height:52px; border-radius:17px; display:grid; place-items:center; flex:none;
   background:radial-gradient(120% 120% at 25% 20%, var(--icon-hl), transparent 55%), linear-gradient(155deg, var(--i1,var(--glow)), var(--i2,var(--gold2)));
   box-shadow:0 10px 20px -8px var(--i1,var(--glow)), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.18);
   color:#fff; position:relative; overflow:hidden;
 }
-.icon3d.sm{ width:32px; height:32px; border-radius:11px }
-.icon3d svg{ width:22px; height:22px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)) }
-.icon3d.sm svg{ width:17px; height:17px }
+.icon3d.sm{ width:36px; height:36px; border-radius:12px }
+.icon3d svg{ width:24px; height:24px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)) }
+.icon3d.sm svg{ width:19px; height:19px }
+/* Quick glossy shine confined to the icon tile itself (not the whole
+   screen) — a short, subtle flash rather than the old full-card sweep. */
+.icon3d::after{
+  content:''; position:absolute; top:0; bottom:0; width:40%; left:-60%;
+  background:linear-gradient(100deg, transparent, var(--shimmer), transparent);
+  opacity:.22; animation:icon-sweep 1.5s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes icon-sweep{ 0%{left:-60%} 45%{left:120%} 100%{left:120%} }
 
 /* ---------- KPI stat tile ---------- */
 .stat{ position:relative; padding:18px 16px; border-radius:18px; background:var(--flat); border:1px solid var(--flat-line); overflow:hidden; box-shadow:0 10px 22px -16px var(--glow-tint) }
@@ -232,6 +244,16 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 }
 .brand-home:active{ transform:scale(.96) }
 .brand-home:disabled{ cursor:default }
+/* Back button: a solid, unmistakable chip (not a faint ghost icon) — the
+   whole point is that it must be impossible to miss on a deep screen. */
+.back-btn{
+  display:grid; place-items:center; width:34px; height:34px; border-radius:11px; flex:none;
+  background:var(--flat); border:1px solid var(--flat-line); color:var(--ink);
+  cursor:pointer; transition:background var(--dur-base) ease, transform var(--dur-fast) var(--ease);
+}
+.back-btn svg{ width:19px; height:19px }
+.back-btn:active{ transform:scale(.92); background:var(--glass) }
+[dir="rtl"] .back-btn svg{ transform:scaleX(-1) } /* chevron points toward reading-start in RTL */
 .main{ flex:1; padding:6px 16px 108px; }
 .navbar{
   position:fixed; inset-inline:0; bottom:0; z-index:35;
@@ -575,8 +597,8 @@ const CSS_DASHBOARD = `
   padding:18px 8px; transition:transform var(--dur-fast) var(--ease), background var(--dur-base) ease, border-color var(--dur-base) ease;
 }
 .dash-cat-card:active{ transform:scale(.94); background:var(--glass) }
-.dash-cat-card .icon3d{ width:58px; height:58px; border-radius:18px }
-.dash-cat-card .icon3d svg{ width:27px; height:27px }
+.dash-cat-card .icon3d{ width:64px; height:64px; border-radius:19px }
+.dash-cat-card .icon3d svg{ width:29px; height:29px }
 .dash-cat-label{ font-weight:700; font-size:12.5px; text-align:center; line-height:1.3 }
 .dash-cat-sub{ font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:-5px }
 `;
@@ -619,8 +641,10 @@ function renderDashboard(root, ctx){
   };
 
   // Three big category tiles — the ONLY way into every other section from
-  // the home screen (mirrors shell.js's MORE_GROUPS keys/order exactly, so
-  // ctx.openSections(key) opens the sheet pre-scrolled to the right group).
+  // the home screen. Each key matches a real screen registered in shell.js
+  // (shell.js's MORE_GROUPS key), so tapping one navigates to a dedicated
+  // category screen (go(key) via the generic data-nav wiring) rather than
+  // opening a sheet — real screen-to-screen navigation with a working back.
   const totalEntities = employeesCount + DB.list('contractors').length + DB.list('visitors').length
     + DB.list('companies').length + DB.list('organizations').length;
   const totalDocsMonitoring = DB.list('documents').length + expiring45Count;
@@ -701,7 +725,7 @@ function renderDashboard(root, ctx){
         </div>
         <div class="dash-cats stagger">
           ${catTiles.map(nt => `
-            <button type="button" class="dash-cat-card" data-open-cat="${nt.key}">
+            <button type="button" class="dash-cat-card" data-nav="${nt.key}">
               <div class="icon3d" style="--i1:${nt.i1};--i2:${nt.i2}">${nt.icon}</div>
               <div class="dash-cat-label">${isAr ? nt.labelAr : nt.labelEn}</div>
               <div class="dash-cat-sub num">${isAr ? nt.subAr : nt.subEn}</div>
@@ -719,12 +743,7 @@ function renderDashboard(root, ctx){
       </div>
     </div>
   `;
-
-  root.querySelectorAll('[data-open-cat]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(typeof ctx.openSections === 'function') ctx.openSections(btn.getAttribute('data-open-cat'));
-    });
-  });
+  // data-nav tiles are wired generically by the shell's wireDataNav() after mount.
 }
 
 // MODULE: Employees
@@ -5464,11 +5483,11 @@ function renderArchive(root, ctx){
     moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>',
   };
 
-  // Bottom nav is kept to exactly 3 icons — Home, Sections (the grouped hub
-  // below) and Settings on its own — so it never reads as cluttered. Every
-  // other screen is reached in two taps: a big category tile on the home
-  // screen (or the "Sections" nav button from anywhere) opens the grouped
-  // sheet below, where every section lives.
+  // Bottom nav is kept to exactly 3 icons — Home, Sections, and Settings on
+  // its own — so it never reads as cluttered. Every other screen is reached
+  // in two real navigation hops: Sections hub -> a category screen (a
+  // handful of icons) -> the actual screen, each a normal go() with a
+  // working back button, never a single screen crammed with every icon.
   const NAV = [
     {key:'dashboard', i1:'var(--glow)', i2:'var(--gold2)'},
     {key:'more', i1:'#B48CE8', i2:'#6B3FA8'},
@@ -5476,9 +5495,9 @@ function renderArchive(root, ctx){
   ];
 
   // Every section except Dashboard/Settings, grouped into 3 categories. Each
-  // group also has a "big tile" icon/color used for the Dashboard's 3 big
-  // category tiles — tapping one opens this same sheet, scrolled to that
-  // group, so navigation to any section always goes through a big icon.
+  // group's key is also registered as a real screen in SCREENS (see below),
+  // rendered by renderCategoryScreen(); its "big tile" icon/color is reused
+  // both on the Dashboard and on the Sections hub screen.
   const MORE_GROUPS = [
     { key:'entities', labelAr:'الكيانات', labelEn:'Entities', bigIcon:'employees', bigI1:'var(--glow)', bigI2:'var(--gold2)', items:[
       {key:'employees', i1:'var(--glow)', i2:'var(--gold2)'},
@@ -5498,7 +5517,6 @@ function renderArchive(root, ctx){
       {key:'archive', i1:'#C9A45C', i2:'#8A6416'},
     ]},
   ];
-  const MORE_ITEMS = MORE_GROUPS.flatMap(g=>g.items);
   const PRIMARY_KEYS = NAV.map(n=>n.key).filter(k=>k!=='more');
 
   function moreTileSub(key){
@@ -5577,9 +5595,6 @@ function renderArchive(root, ctx){
       setTheme(th){ setTheme(th); },
       setAccent(a){ setAccent(a); },
       openProfile(entityType, entityId){ openProfile(entityType, entityId); },
-      // Opens the grouped "Sections" sheet — optionally scrolled straight to
-      // one category — so a big tile on the Dashboard can route into it.
-      openSections(groupKey){ openMoreSheet(groupKey); },
     };
   }
 
@@ -5598,6 +5613,13 @@ function renderArchive(root, ctx){
     library: (root, ctx)=> renderLibrary(root, ctx),
     forms: (root, ctx)=> renderForms(root, ctx),
     archive: (root, ctx)=> renderArchive(root, ctx),
+    // The Sections hub and its 3 category screens are real screens (not a
+    // modal sheet) so every level gets a proper, working back button and
+    // never crams more than a handful of icons onto one screen.
+    sections: (root, ctx)=> renderSectionsHub(root, ctx),
+    entities: (root, ctx)=> renderCategoryScreen(root, ctx, 'entities'),
+    docs: (root, ctx)=> renderCategoryScreen(root, ctx, 'docs'),
+    resources: (root, ctx)=> renderCategoryScreen(root, ctx, 'resources'),
   };
 
   function go(screen){
@@ -5608,6 +5630,21 @@ function renderArchive(root, ctx){
     renderScreen(screen);
     renderNav();
     renderTop(); // keep the back button / home-logo button in sync with the new screen
+  }
+  // Jumps straight to a top-level destination (bottom-nav tap, the brand/
+  // logo "home" shortcut) with a clean, empty history — unlike go(), this
+  // never leaves a stale back button behind. go() still pushes the CURRENT
+  // screen even when called right after clearing history, which is exactly
+  // the bug that left the back chevron visible on the dashboard after using
+  // the bottom nav to jump home from a deep screen.
+  function goReset(screen){
+    state.history = [];
+    if(screen === state.screen){ renderTop(); return; }
+    state.screen = screen;
+    state.profileTarget = null;
+    renderScreen(screen);
+    renderNav();
+    renderTop();
   }
   function goBack(){
     const prev = state.history.pop();
@@ -5713,7 +5750,7 @@ function renderArchive(root, ctx){
     const homeTitle = state.lang==='ar' ? 'العودة للرئيسية' : 'Back to home';
     top.innerHTML = `
       <div class="brand">
-        ${showBack ? `<button id="backBtn" class="btn ghost sm" style="padding:8px">${ICONS.chevronBack}</button>` : ''}
+        ${showBack ? `<button id="backBtn" class="back-btn" title="${state.lang==='ar'?'رجوع':'Back'}" aria-label="${state.lang==='ar'?'رجوع':'Back'}">${ICONS.chevronBack}</button>` : ''}
         <button id="brandHomeBtn" class="brand-home" ${onHome ? 'disabled' : ''} title="${homeTitle}" aria-label="${homeTitle}">
           <span class="icon3d sm" style="--i1:var(--glow);--i2:var(--gold2)">${ICONS.dashboard}</span>
           <span>${t.appName}</span>
@@ -5726,7 +5763,7 @@ function renderArchive(root, ctx){
     const back = document.getElementById('backBtn');
     if(back) back.addEventListener('click', goBack);
     const brandHome = document.getElementById('brandHomeBtn');
-    if(brandHome && !onHome) brandHome.addEventListener('click', ()=>{ closeOverlay(); state.history=[]; go('dashboard'); });
+    if(brandHome && !onHome) brandHome.addEventListener('click', ()=>{ closeOverlay(); goReset('dashboard'); });
     const quickTheme = document.getElementById('quickThemeBtn');
     if(quickTheme) quickTheme.addEventListener('click', ()=>{ setTheme(state.theme === 'night' ? 'day' : 'night'); renderTop(); });
   }
@@ -5744,52 +5781,55 @@ function renderArchive(root, ctx){
     nav.querySelectorAll('[data-go]').forEach(b=>{
       b.addEventListener('click', ()=>{
         const key = b.getAttribute('data-go');
-        if(key === 'more'){ openMoreSheet(); return; }
-        state.history=[]; go(key);
+        goReset(key === 'more' ? 'sections' : key);
       });
     });
   }
 
-  // ---------------- "More" hub sheet (the other sections live here) ----------------
-  function openMoreSheet(focusGroupKey){
+  // ---------------- Sections hub + category screens (real navigation) ----------------
+  // Dashboard -> (tap a big tile) -> category screen (e.g. "entities": a
+  // handful of icons) -> (tap one) -> the actual screen. Every hop is a
+  // normal go(), so history is real and the back button always works.
+  function renderSectionsHub(root, ctx){
+    const isAr = state.lang === 'ar';
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:18px">
+        <div class="eyebrow">${isAr ? 'الأقسام' : 'Sections'}</div>
+        <p class="muted" style="margin-top:6px">${isAr ? 'اختر تصنيفاً للوصول إلى أقسامه' : 'Pick a category to reach its sections'}</p>
+      </div>
+      <div class="dash-cats stagger">
+        ${MORE_GROUPS.map(g=>`
+          <button type="button" class="dash-cat-card" data-nav="${g.key}">
+            <div class="icon3d" style="--i1:${g.bigI1};--i2:${g.bigI2}">${ICONS[g.bigIcon]}</div>
+            <div class="dash-cat-label">${isAr ? g.labelAr : g.labelEn}</div>
+            <div class="dash-cat-sub num">${g.items.length} ${isAr ? 'أقسام' : 'sections'}</div>
+          </button>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderCategoryScreen(root, ctx, groupKey){
+    const g = MORE_GROUPS.find(x=>x.key === groupKey);
     const t = I18N[state.lang];
     const isAr = state.lang === 'ar';
-    const title = isAr ? 'الأقسام' : 'Sections';
-    const groupsHtml = MORE_GROUPS.map(g=>`
-      <div class="more-group" data-group-key="${g.key}">
-        <div class="more-group-label">${isAr ? g.labelAr : g.labelEn}</div>
-        <div class="more-grid">
-          ${g.items.map(n=>`
-            <button type="button" class="more-tile" data-more-go="${n.key}">
-              <span class="icon3d" style="--i1:${n.i1};--i2:${n.i2}">${ICONS[n.key]}</span>
-              <span class="more-tile-text">
-                <span class="more-tile-label">${navLabel(n.key, t)}</span>
-                <span class="more-tile-sub num">${moreTileSub(n.key)}</span>
-              </span>
-            </button>
-          `).join('')}
-        </div>
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:18px">
+        <div class="eyebrow">${isAr ? g.labelAr : g.labelEn}</div>
+        <p class="muted" style="margin-top:6px">${isAr ? 'اختر قسماً للمتابعة' : 'Choose a section to continue'}</p>
       </div>
-    `).join('');
-    const html = `
-      <div class="more-handle"></div>
-      <h2 class="h2" style="margin-bottom:16px">${title}</h2>
-      ${groupsHtml}
+      <div class="more-grid cat-grid stagger">
+        ${g.items.map(n=>`
+          <button type="button" class="more-tile" data-nav="${n.key}">
+            <span class="icon3d" style="--i1:${n.i1};--i2:${n.i2}">${ICONS[n.key]}</span>
+            <span class="more-tile-text">
+              <span class="more-tile-label">${navLabel(n.key, t)}</span>
+              <span class="more-tile-sub num">${moreTileSub(n.key)}</span>
+            </span>
+          </button>
+        `).join('')}
+      </div>
     `;
-    openOverlay(html, (sheet)=>{
-      sheet.querySelectorAll('[data-more-go]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const key = btn.getAttribute('data-more-go');
-          closeOverlay();
-          state.history=[];
-          go(key);
-        });
-      });
-      if(focusGroupKey){
-        const target = sheet.querySelector(`[data-group-key="${focusGroupKey}"]`);
-        if(target) target.scrollIntoView({block:'start'});
-      }
-    });
   }
 
   function setLang(l){

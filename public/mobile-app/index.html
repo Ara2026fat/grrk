@@ -62,7 +62,7 @@
   --ok:#188A5E; --warn:#A06A00; --danger:#C83C53;
   --btn-bg:rgba(37,65,168,.16); --btn-line:rgba(37,65,168,.4); --btn-ink:#1C2E7A;
   --shimmer:rgba(255,255,255,.85);
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(37,65,168,.12), transparent 70%), var(--void);
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(37,65,168,.34), transparent 68%), var(--void);
   /* Icon tiles get a much lighter gloss highlight in day mode — the full
      night-mode highlight washes bright accent colors out against the
      near-white page background. */
@@ -79,7 +79,7 @@
 :root[data-theme="day"][data-accent="forest"]{
   --glow:#146B45; --glow-tint:rgba(20,107,69,.16);
   --btn-bg:rgba(20,107,69,.17); --btn-line:rgba(20,107,69,.38); --btn-ink:#0E4A30;
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(20,107,69,.1), transparent 70%), var(--void);
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(20,107,69,.3), transparent 68%), var(--void);
 }
 /* graphite — steel gray, understated and technical */
 :root[data-theme="night"][data-accent="graphite"]{
@@ -90,7 +90,7 @@
 :root[data-theme="day"][data-accent="graphite"]{
   --glow:#444E5E; --glow-tint:rgba(68,78,94,.16);
   --btn-bg:rgba(68,78,94,.16); --btn-line:rgba(68,78,94,.36); --btn-ink:#2B3240;
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(68,78,94,.1), transparent 70%), var(--void);
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(68,78,94,.3), transparent 68%), var(--void);
 }
 /* amber — warm, glossy honey-gold accent */
 :root[data-theme="night"][data-accent="amber"]{
@@ -101,7 +101,7 @@
 :root[data-theme="day"][data-accent="amber"]{
   --glow:#9C6B12; --glow-tint:rgba(156,107,18,.18);
   --btn-bg:rgba(156,107,18,.18); --btn-line:rgba(156,107,18,.4); --btn-ink:#5C3E08;
-  --app-bg:radial-gradient(1100px 560px at 50% -120px, rgba(156,107,18,.12), transparent 70%), var(--void);
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(156,107,18,.34), transparent 68%), var(--void);
 }
 
 *{box-sizing:border-box; margin:0}
@@ -129,8 +129,11 @@ button, input, textarea, select{font-family:inherit}
   padding:22px 20px; position:relative; overflow:hidden;
 }
 .glass::before{
-  content:''; position:absolute; inset:0 14% auto; height:1px; border-radius:1px;
-  background:linear-gradient(90deg,transparent,var(--edge),transparent);
+  /* accent-tinted hairline so the chosen accent color reads clearly on the
+     hero card itself, not only in the faint ambient page glow behind it */
+  content:''; position:absolute; inset:0 14% auto; height:1.5px; border-radius:1px;
+  background:linear-gradient(90deg,transparent,var(--glow),transparent);
+  opacity:.55;
 }
 .glass::after{ /* slow shimmer sweep for the "hero" surface */
   content:''; position:absolute; top:0; bottom:0; width:40%; left:-60%;
@@ -208,8 +211,8 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .icon3d.sm svg{ width:17px; height:17px }
 
 /* ---------- KPI stat tile ---------- */
-.stat{ position:relative; padding:18px 16px; border-radius:18px; background:var(--flat); border:1px solid var(--flat-line); overflow:hidden }
-.stat .val{ font-family:var(--display); font-size:28px; font-weight:700; font-variant-numeric:tabular-nums }
+.stat{ position:relative; padding:18px 16px; border-radius:18px; background:var(--flat); border:1px solid var(--flat-line); overflow:hidden; box-shadow:0 10px 22px -16px var(--glow-tint) }
+.stat .val{ font-family:var(--display); font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--glow) }
 .stat .lbl{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
 .stat .trend{ position:absolute; inset-inline-end:14px; top:16px; font-size:12px; font-weight:700 }
 .stat .trend.up{ color:var(--ok) } .stat .trend.down{ color:var(--danger) }
@@ -550,20 +553,20 @@ const CSS_DASHBOARD = `
 .dash-empty-ok{ display:flex; align-items:center; gap:14px; padding:18px }
 .dash-empty-ok .icon3d{ --i1:var(--ok); --i2:#1f8f66 }
 .dash-alerts-more{ display:block; width:100%; text-align:center; background:none; border:none; color:var(--glow); font-weight:700; font-size:13px; padding:10px; cursor:pointer }
-/* Compact icon-launcher grid — the whole point is to reach every section
-   from the home screen without much scrolling, so tiles are icon+label
-   only (no subtitle line) and packed 4 to a row like a phone home screen. */
-.dash-links{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px 6px }
-@media (min-width:420px){ .dash-links{ grid-template-columns:repeat(4,1fr) } }
-.dash-link-card{
-  display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer; width:100%;
-  background:none; border:none; padding:8px 2px; border-radius:14px;
-  transition:transform var(--dur-fast) var(--ease), background var(--dur-base) ease;
+/* Three big category tiles — one row, no scrolling of their own. Tapping
+   one opens the grouped Sections sheet scrolled to that category, so every
+   other screen is reached only through one of these big icons. */
+.dash-cats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px }
+.dash-cat-card{
+  display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; width:100%;
+  background:var(--flat); border:1px solid var(--flat-line); border-radius:var(--radius-md);
+  padding:18px 8px; transition:transform var(--dur-fast) var(--ease), background var(--dur-base) ease, border-color var(--dur-base) ease;
 }
-.dash-link-card:active{ transform:scale(.9); background:var(--flat) }
-.dash-link-card .icon3d{ width:54px; height:54px; border-radius:17px }
-.dash-link-card .icon3d svg{ width:25px; height:25px }
-.dash-link-label{ font-weight:600; font-size:11.5px; text-align:center; line-height:1.25; max-width:100%; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical }
+.dash-cat-card:active{ transform:scale(.94); background:var(--glass) }
+.dash-cat-card .icon3d{ width:58px; height:58px; border-radius:18px }
+.dash-cat-card .icon3d svg{ width:27px; height:27px }
+.dash-cat-label{ font-weight:700; font-size:12.5px; text-align:center; line-height:1.3 }
+.dash-cat-sub{ font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:-5px }
 `;
 
 // Mount function — called by the shell router.
@@ -603,22 +606,17 @@ function renderDashboard(root, ctx){
     archive: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M4.5 9v8a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>'
   };
 
-  // Every section lives on the home screen's own Quick Access grid, so this
-  // is the real navigation hub — the bottom nav only carries the 4 most-used
-  // screens plus a "More" shortcut to this same list.
-  const navTiles = [
-    { key:'employees', icon:icons.employees, labelAr:'الموظفون', labelEn:'Employees', subAr:employeesCount + ' سجل', subEn:employeesCount + ' records', i1:'var(--glow)', i2:'var(--gold2)' },
-    { key:'documents', icon:icons.documents, labelAr:'المستندات', labelEn:'Documents', subAr:DB.list('documents').length + ' سجل', subEn:DB.list('documents').length + ' records', i1:'#C2524F', i2:'#8C2E2E' },
-    { key:'contractors', icon:icons.contractors, labelAr:'المقاولون', labelEn:'Contractors', subAr:DB.list('contractors').length + ' سجل', subEn:DB.list('contractors').length + ' records', i1:'#6FA8E0', i2:'#2E6FA8' },
-    { key:'visitors', icon:icons.visitors, labelAr:'الزوار', labelEn:'Visitors', subAr:DB.list('visitors').length + ' سجل', subEn:DB.list('visitors').length + ' records', i1:'#E0A86F', i2:'#A86F2E' },
-    { key:'companiesorgs', icon:icons.companies, labelAr:'الشركات/الجهات', labelEn:'Companies/Orgs', subAr:(DB.list('companies').length + DB.list('organizations').length) + ' سجل', subEn:(DB.list('companies').length + DB.list('organizations').length) + ' records', i1:'#7FD6A8', i2:'#2E9966' },
-    { key:'reports', icon:icons.reports, labelAr:'التقارير', labelEn:'Reports', subAr:isAr?'تصدير ومشاركة':'', subEn:'Export & share', i1:'#B48CE8', i2:'#6B3FA8' },
-    { key:'alerts', icon:icons.alert, labelAr:'التنبيهات', labelEn:'Alerts', subAr:expiring45Count + ' تنبيه', subEn:expiring45Count + ' alerts', i1:'#FFC168', i2:'#B4790F' },
-    { key:'profiles', icon:icons.profiles, labelAr:'الملفات', labelEn:'Profiles', subAr:isAr?'استعراض الملفات':'', subEn:'Browse profiles', i1:'#8CC8E8', i2:'#2E7FA8' },
-    { key:'library', icon:icons.library, labelAr:'المكتبة', labelEn:'Library', subAr:DB.list('library').length + ' عنصر', subEn:DB.list('library').length + ' items', i1:'#5FB8D9', i2:'#2E7F9C' },
-    { key:'forms', icon:icons.forms, labelAr:'النماذج', labelEn:'Forms', subAr:DB.list('forms').length + ' نموذج', subEn:DB.list('forms').length + ' forms', i1:'#9AA5B8', i2:'#5A6578' },
-    { key:'archive', icon:icons.archive, labelAr:'الأرشيف', labelEn:'Archive', subAr:DB.list('archiveItems').length + ' عنصر', subEn:DB.list('archiveItems').length + ' items', i1:'#C9A45C', i2:'#8A6416' },
-    { key:'settings', icon:icons.settings, labelAr:'الإعدادات', labelEn:'Settings', subAr:isAr?'اللغة والمظهر':'', subEn:'Language & theme', i1:'var(--ink-faint)', i2:'var(--ink-soft)' },
+  // Three big category tiles — the ONLY way into every other section from
+  // the home screen (mirrors shell.js's MORE_GROUPS keys/order exactly, so
+  // ctx.openSections(key) opens the sheet pre-scrolled to the right group).
+  const totalEntities = employeesCount + DB.list('contractors').length + DB.list('visitors').length
+    + DB.list('companies').length + DB.list('organizations').length;
+  const totalDocsMonitoring = DB.list('documents').length + expiring45Count;
+  const totalResources = DB.list('library').length + DB.list('forms').length + DB.list('archiveItems').length;
+  const catTiles = [
+    { key:'entities', icon:icons.employees, labelAr:'الكيانات', labelEn:'Entities', subAr: totalEntities + ' سجل', subEn: totalEntities + ' records', i1:'var(--glow)', i2:'var(--gold2)' },
+    { key:'docs', icon:icons.documents, labelAr:'المستندات والمتابعة', labelEn:'Documents & Monitoring', subAr: totalDocsMonitoring + ' عنصر', subEn: totalDocsMonitoring + ' items', i1:'#C2524F', i2:'#8C2E2E' },
+    { key:'resources', icon:icons.archive, labelAr:'الموارد والمحتوى', labelEn:'Resources & Content', subAr: totalResources + ' عنصر', subEn: totalResources + ' items', i1:'#C9A45C', i2:'#8A6416' },
   ];
 
   function dayLabel(d){
@@ -697,17 +695,24 @@ function renderDashboard(root, ctx){
         <div class="dash-section-head">
           <h2>${isAr ? 'الأقسام' : 'Sections'}</h2>
         </div>
-        <div class="dash-links stagger">
-          ${navTiles.map(nt => `
-            <button type="button" class="dash-link-card" data-nav="${nt.key}">
+        <div class="dash-cats stagger">
+          ${catTiles.map(nt => `
+            <button type="button" class="dash-cat-card" data-open-cat="${nt.key}">
               <div class="icon3d" style="--i1:${nt.i1};--i2:${nt.i2}">${nt.icon}</div>
-              <div class="dash-link-label">${isAr ? nt.labelAr : nt.labelEn}</div>
+              <div class="dash-cat-label">${isAr ? nt.labelAr : nt.labelEn}</div>
+              <div class="dash-cat-sub num">${isAr ? nt.subAr : nt.subEn}</div>
             </button>
           `).join('')}
         </div>
       </div>
     </div>
   `;
+
+  root.querySelectorAll('[data-open-cat]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(typeof ctx.openSections === 'function') ctx.openSections(btn.getAttribute('data-open-cat'));
+    });
+  });
 }
 
 // MODULE: Employees
@@ -5435,7 +5440,9 @@ function renderArchive(root, ctx){
     alerts:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.3" stroke="currentColor" stroke-width="1.1" opacity=".3"/><circle cx="12" cy="12" r="6.2" stroke="currentColor" stroke-width="1.1" opacity=".42"/><circle cx="12" cy="12" r="3.1" stroke="currentColor" stroke-width="1.1" opacity=".55"/><path d="M12 12 L12 2.7 A9.3 9.3 0 0 1 20.3 8 Z" fill="currentColor" opacity=".5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="2.2s" repeatCount="indefinite"/></path><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.6" cy="7.4" r="1.15" fill="currentColor"><animate attributeName="opacity" values="0;0;1;0" keyTimes="0;.55;.63;1" dur="2.2s" repeatCount="indefinite"/></circle></svg>',
     reports:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M20 20H4"/></svg>',
     profiles:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-1.8 1.8-2.6 3-2.6s2.5.8 3 2.6M14.5 10h4M14.5 13.5h4"/></svg>',
-    settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4.6a7.6 7.6 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-.6-2 3.4L6.4 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-.6c.5.4 1.1.75 1.7 1l.4 2.6h4l.4-2.6c.6-.25 1.2-.6 1.7-1l2.4.6 2-3.4-2-1.6Z"/></svg>',
+    // "Sliders" glyph — two lines, each with a round knob — reads as
+    // Settings more clearly than a gear at small icon-tile sizes.
+    settings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="15" cy="7" r="2.3" fill="currentColor" stroke="none"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="9" cy="17" r="2.3" fill="currentColor" stroke="none"/></svg>',
     library:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9.2"/><path d="M10 8.3v7.4l6-3.7-6-3.7Z" fill="currentColor" stroke="none"/></svg>',
     forms:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="m9.5 13.5 1.6 1.6 3.4-3.6"/></svg>',
     archive:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M4.5 9v8a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>',
@@ -5445,36 +5452,38 @@ function renderArchive(root, ctx){
     moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>',
   };
 
-  // Bottom nav shows only the top 4 day-to-day screens + a "More" hub.
-  // Everything else lives behind "More" (a grid sheet) and in the Dashboard's
-  // own Quick Access grid, so the home screen stays the real hub for navigation
-  // instead of cramming 13 icons into 3 cramped rows at the bottom.
+  // Bottom nav is kept to exactly 3 icons — Home, Sections (the grouped hub
+  // below) and Settings on its own — so it never reads as cluttered. Every
+  // other screen is reached in two taps: a big category tile on the home
+  // screen (or the "Sections" nav button from anywhere) opens the grouped
+  // sheet below, where every section lives.
   const NAV = [
     {key:'dashboard', i1:'var(--glow)', i2:'var(--gold2)'},
-    {key:'employees', i1:'var(--glow)', i2:'var(--gold2)'},
-    {key:'documents', i1:'#C2524F', i2:'#8C2E2E'},
-    {key:'reports', i1:'#B48CE8', i2:'#6B3FA8'},
-    {key:'more', i1:'var(--ink-faint)', i2:'var(--ink-soft)'},
+    {key:'more', i1:'#B48CE8', i2:'#6B3FA8'},
+    {key:'settings', i1:'var(--ink-faint)', i2:'var(--ink-soft)'},
   ];
 
-  // The rest of the sections — reachable via the "More" sheet and the
-  // Dashboard's Quick Access grid. Grouped into categories so the sheet reads
-  // as a curated hub rather than one flat wall of icons.
+  // Every section except Dashboard/Settings, grouped into 3 categories. Each
+  // group also has a "big tile" icon/color used for the Dashboard's 3 big
+  // category tiles — tapping one opens this same sheet, scrolled to that
+  // group, so navigation to any section always goes through a big icon.
   const MORE_GROUPS = [
-    { labelAr:'العلاقات والجهات', labelEn:'Relations & Entities', items:[
+    { key:'entities', labelAr:'الكيانات', labelEn:'Entities', bigIcon:'employees', bigI1:'var(--glow)', bigI2:'var(--gold2)', items:[
+      {key:'employees', i1:'var(--glow)', i2:'var(--gold2)'},
       {key:'contractors', i1:'#6FA8E0', i2:'#2E6FA8'},
       {key:'visitors', i1:'#E0A86F', i2:'#A86F2E'},
       {key:'companiesorgs', i1:'#7FD6A8', i2:'#2E9966'},
       {key:'profiles', i1:'#8CC8E8', i2:'#2E7FA8'},
     ]},
-    { labelAr:'الموارد والمحتوى', labelEn:'Resources & Content', items:[
+    { key:'docs', labelAr:'المستندات والمتابعة', labelEn:'Documents & Monitoring', bigIcon:'documents', bigI1:'#C2524F', bigI2:'#8C2E2E', items:[
+      {key:'documents', i1:'#C2524F', i2:'#8C2E2E'},
+      {key:'reports', i1:'#B48CE8', i2:'#6B3FA8'},
+      {key:'alerts', i1:'#FFC168', i2:'#B4790F'},
+    ]},
+    { key:'resources', labelAr:'الموارد والمحتوى', labelEn:'Resources & Content', bigIcon:'archive', bigI1:'#C9A45C', bigI2:'#8A6416', items:[
       {key:'library', i1:'#5FB8D9', i2:'#2E7F9C'},
       {key:'forms', i1:'#9AA5B8', i2:'#5A6578'},
       {key:'archive', i1:'#C9A45C', i2:'#8A6416'},
-    ]},
-    { labelAr:'المتابعة والنظام', labelEn:'Monitoring & System', items:[
-      {key:'alerts', i1:'#FFC168', i2:'#B4790F'},
-      {key:'settings', i1:'var(--ink-faint)', i2:'var(--ink-soft)'},
     ]},
   ];
   const MORE_ITEMS = MORE_GROUPS.flatMap(g=>g.items);
@@ -5493,7 +5502,6 @@ function renderArchive(root, ctx){
       forms: n('forms') + (isAr ? ' نموذج' : ' forms'),
       archive: n('archiveItems') + (isAr ? ' عنصر' : ' items'),
       alerts: isAr ? 'رصد المخاطر' : 'Risk monitoring',
-      settings: isAr ? 'اللغة والمظهر' : 'Language & theme',
     };
     return map[key] || '';
   }
@@ -5508,7 +5516,7 @@ function renderArchive(root, ctx){
       forms: state.lang==='ar' ? 'النماذج' : 'Forms',
       archive: state.lang==='ar' ? 'الأرشيف' : 'Archive',
       settings:t.settings,
-      more: state.lang==='ar' ? 'المزيد' : 'More',
+      more: state.lang==='ar' ? 'الأقسام' : 'Sections',
     };
     return map[key];
   }
@@ -5557,6 +5565,9 @@ function renderArchive(root, ctx){
       setTheme(th){ setTheme(th); },
       setAccent(a){ setAccent(a); },
       openProfile(entityType, entityId){ openProfile(entityType, entityId); },
+      // Opens the grouped "Sections" sheet — optionally scrolled straight to
+      // one category — so a big tile on the Dashboard can route into it.
+      openSections(groupKey){ openMoreSheet(groupKey); },
     };
   }
 
@@ -5719,12 +5730,12 @@ function renderArchive(root, ctx){
   }
 
   // ---------------- "More" hub sheet (the other sections live here) ----------------
-  function openMoreSheet(){
+  function openMoreSheet(focusGroupKey){
     const t = I18N[state.lang];
     const isAr = state.lang === 'ar';
-    const title = isAr ? 'المزيد من الأقسام' : 'More sections';
+    const title = isAr ? 'الأقسام' : 'Sections';
     const groupsHtml = MORE_GROUPS.map(g=>`
-      <div class="more-group">
+      <div class="more-group" data-group-key="${g.key}">
         <div class="more-group-label">${isAr ? g.labelAr : g.labelEn}</div>
         <div class="more-grid">
           ${g.items.map(n=>`
@@ -5753,6 +5764,10 @@ function renderArchive(root, ctx){
           go(key);
         });
       });
+      if(focusGroupKey){
+        const target = sheet.querySelector(`[data-group-key="${focusGroupKey}"]`);
+        if(target) target.scrollIntoView({block:'start'});
+      }
     });
   }
 

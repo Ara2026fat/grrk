@@ -4,12 +4,15 @@
   Single-file build · نظام اللمعان البصري (Luster Glass Design System)
   (c) 2026 ARAFAT ALRAJHI. All Rights Reserved.
 -->
-<html lang="ar" dir="rtl" data-theme="night" data-accent="indigo">
+<html lang="ar" dir="rtl" data-theme="day" data-accent="indigo">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0B0D14">
+<meta name="theme-color" content="#F3F2EC">
 <meta name="author" content="Arafat Alrajhi">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
 <title>GRRK — منصة ذكاء العلاقات الحكومية</title>
 <style>
 /* ============================================================
@@ -305,6 +308,18 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .empty{ text-align:center; padding:50px 20px; color:var(--ink-faint) }
 .toast{ position:fixed; inset-inline:16px; bottom:calc(92px + env(safe-area-inset-bottom)); max-width:420px; margin:auto; background:var(--solid); color:var(--ink); border:1px solid var(--glass-line); padding:13px 18px; border-radius:14px; font-size:14px; z-index:300; animation:sheet-in .25s var(--ease) }
 
+/* ---------- PWA install banner ---------- */
+.install-banner{ position:fixed; inset-inline:14px; bottom:calc(92px + env(safe-area-inset-bottom)); max-width:460px; margin:auto; display:flex; align-items:center; gap:12px; background:var(--solid); color:var(--ink); border:1px solid var(--glass-line); padding:13px 14px; border-radius:16px; box-shadow:0 14px 30px -10px rgba(0,0,0,.28); z-index:260; animation:sheet-in .25s var(--ease) }
+.install-banner .ib-icon{ flex:0 0 auto; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:var(--btn-bg); color:var(--glow) }
+.install-banner .ib-icon svg{ width:20px; height:20px }
+.install-banner .ib-text{ flex:1; min-width:0 }
+.install-banner .ib-title{ font-size:13.5px; font-weight:700; color:var(--ink) }
+.install-banner .ib-sub{ font-size:12px; color:var(--ink-faint); margin-top:2px }
+.install-banner .ib-actions{ display:flex; align-items:center; gap:6px; flex:0 0 auto }
+.install-banner .ib-install{ background:var(--glow); color:#fff; border:none; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer }
+.install-banner .ib-close{ background:none; border:none; color:var(--ink-faint); cursor:pointer; padding:6px; display:flex }
+.install-banner .ib-close svg{ width:16px; height:16px }
+
 /* ---------- "More" hub sheet ---------- */
 .more-handle{ width:40px; height:4px; border-radius:99px; background:var(--flat-line); margin:0 auto 16px }
 .more-sheet{ max-height:82vh; overflow-y:auto; overscroll-behavior:contain }
@@ -349,6 +364,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-21T21:51:34Z', dmy: '22/10/2026', hm: '00:51' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -3536,6 +3552,16 @@ const CSS_SETTINGS = `
 .set-swatch i{ display:block; width:30px; height:30px; border-radius:50%; background:linear-gradient(155deg, var(--sw-color), var(--sw-color2)); box-shadow:0 6px 14px -4px var(--sw-color), inset 0 1px 0 rgba(255,255,255,.4) }
 .set-swatch span{ font-size:12px; font-weight:600; color:var(--ink-soft) }
 .set-swatch.active span{ color:var(--ink) }
+.set-info-row{ display:flex; align-items:center; justify-content:space-between; padding:9px 0; font-size:13.5px; border-bottom:1px solid var(--flat-line) }
+.set-info-row:last-child{ border-bottom:none; padding-bottom:0 }
+.set-info-row .k{ color:var(--ink-faint) }
+.set-info-row .v{ color:var(--ink); font-weight:700 }
+.set-pwa-badge{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:99px; font-size:12px; font-weight:700 }
+.set-pwa-badge.on{ background:rgba(31,158,99,.16); color:#1F9E63 }
+.set-pwa-badge.off{ background:var(--flat); color:var(--ink-faint) }
+.set-pwa-dot{ width:7px; height:7px; border-radius:50% }
+.set-pwa-badge.on .set-pwa-dot{ background:#1F9E63 }
+.set-pwa-badge.off .set-pwa-dot{ background:var(--ink-faint) }
 `;
 
 // Mount function — called by the shell router.
@@ -3547,19 +3573,23 @@ function renderSettings(root, ctx){
   const lang = ctx.lang;
   const t = ctx.t;
   const isAr = lang === 'ar';
-  const curTheme = document.documentElement.getAttribute('data-theme') || 'night';
   const curAccent = document.documentElement.getAttribute('data-accent') || 'indigo';
-  // Swatch preview colors must match what the theme will actually look like —
-  // each accent has its own night/day pair (see design-tokens.css), so the
-  // preview uses whichever one is live right now instead of always showing
-  // the night-mode shade even while in day mode.
-  const isNight = curTheme === 'night';
+  // Night mode is disabled app-wide for now (see shell.js), so the day-mode
+  // swatch shades are always the right preview — no isNight branching needed.
   const ACCENTS = [
-    {key:'indigo', c1: isNight ? '#4F72E0' : '#2541A8', c2:'#8A6416', labelAr:'كحلي', labelEn:'Navy'},
-    {key:'forest', c1: isNight ? '#1F9E63' : '#146B45', c2:'#8A6416', labelAr:'أخضر داكن', labelEn:'Forest'},
-    {key:'amber', c1: isNight ? '#F0B93C' : '#9C6B12', c2: isNight ? '#B4790F' : '#5C3E08', labelAr:'أصفر لامع', labelEn:'Amber'},
-    {key:'graphite', c1: isNight ? '#8792A6' : '#444E5E', c2:'#8A6416', labelAr:'رمادي فولاذي', labelEn:'Graphite'},
+    {key:'indigo', c1:'#2541A8', c2:'#8A6416', labelAr:'كحلي', labelEn:'Navy'},
+    {key:'forest', c1:'#146B45', c2:'#8A6416', labelAr:'أخضر داكن', labelEn:'Forest'},
+    {key:'amber', c1:'#9C6B12', c2:'#5C3E08', labelAr:'أصفر لامع', labelEn:'Amber'},
+    {key:'graphite', c1:'#444E5E', c2:'#8A6416', labelAr:'رمادي فولاذي', labelEn:'Graphite'},
   ];
+
+  // Build/version info + PWA install status come from the shell (ctx.appInfo),
+  // computed once at boot — see shell.js for BUILD_STAMP / install detection.
+  const info = (typeof ctx.appInfo === 'function') ? ctx.appInfo() : {};
+  const buildLabel = info.buildLabel || 'GRRK · v1.0';
+  const lastUpdated = info.lastUpdated || '—';
+  const isInstalled = !!info.isInstalled;
+  const canInstall = !!info.canInstall;
 
   const screen = document.createElement('div');
   screen.className = '';
@@ -3569,7 +3599,7 @@ function renderSettings(root, ctx){
       <div class="eyebrow">${isAr ? 'الإعدادات' : 'SETTINGS'}</div>
       <h1 class="h1" style="margin-top:6px">${t.appName}</h1>
       <div class="muted" style="margin-top:4px">${t.appTag}</div>
-      <div class="set-build">GRRK · v1.0 · ${isAr ? 'نسخة محلية' : 'Local build'}</div>
+      <div class="set-build">${buildLabel}</div>
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -3581,11 +3611,22 @@ function renderSettings(root, ctx){
     </div>
 
     <div class="card" style="margin-bottom:14px">
-      <div class="set-label">${isAr ? 'المظهر' : 'Theme'}</div>
-      <div class="set-choices">
-        <button type="button" class="choice set-theme-btn ${curTheme==='night' ? 'active' : ''}" data-theme="night">${isAr ? 'ليلي' : 'Night'}</button>
-        <button type="button" class="choice set-theme-btn ${curTheme==='day' ? 'active' : ''}" data-theme="day">${isAr ? 'نهاري' : 'Day'}</button>
+      <div class="set-label">${isAr ? 'حول التطبيق' : 'App info'}</div>
+      <div class="set-info-row">
+        <span class="k">${isAr ? 'الإصدار' : 'Version'}</span>
+        <span class="v">${buildLabel}</span>
       </div>
+      <div class="set-info-row">
+        <span class="k">${isAr ? 'آخر تحديث' : 'Last updated'}</span>
+        <span class="v num">${lastUpdated}</span>
+      </div>
+      <div class="set-info-row">
+        <span class="k">${isAr ? 'حالة التثبيت' : 'Install status'}</span>
+        <span class="set-pwa-badge ${isInstalled ? 'on' : 'off'}"><span class="set-pwa-dot"></span>${isInstalled ? (isAr ? 'مثبّت' : 'Installed') : (isAr ? 'غير مثبّت' : 'Not installed')}</span>
+      </div>
+      ${(!isInstalled && canInstall) ? `
+        <button type="button" class="btn" id="set-install-btn" style="margin-top:12px">${isAr ? 'تثبيت التطبيق' : 'Install app'}</button>
+      ` : ''}
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -3635,18 +3676,15 @@ function renderSettings(root, ctx){
     });
   });
 
-  // ---- Theme toggle ----
-  screen.querySelectorAll('.set-theme-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const chosen = btn.getAttribute('data-theme');
-      if (typeof ctx.setTheme === 'function'){
-        ctx.setTheme(chosen);
-      } else {
-        document.documentElement.setAttribute('data-theme', chosen);
+  // ---- Install app (PWA) ----
+  const installBtn = screen.querySelector('#set-install-btn');
+  if (installBtn){
+    installBtn.addEventListener('click', ()=>{
+      if (typeof ctx.promptInstall === 'function'){
+        ctx.promptInstall();
       }
-      screen.querySelectorAll('.set-theme-btn').forEach(b=>b.classList.toggle('active', b===btn));
     });
-  });
+  }
 
   // ---- Accent color ----
   screen.querySelectorAll('.set-swatch').forEach(btn=>{
@@ -5441,9 +5479,29 @@ function renderArchive(root, ctx){
   function saveUI(ui){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(ui)); }catch(e){} }
 
   const ui0 = loadUI();
+  // ---------------- PWA install state ----------------
+  // Populated by the beforeinstallprompt/appinstalled listeners registered
+  // in boot(). Settings reads this through ctx.appInfo()/ctx.promptInstall().
+  const pwa = {
+    deferredEvent: null,   // the captured beforeinstallprompt event
+    installed: false,      // true once already running standalone, or after install
+    bannerDismissed: false,
+  };
+  function detectStandalone(){
+    try{
+      if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if(window.navigator && window.navigator.standalone) return true; // iOS Safari
+    }catch(e){}
+    return false;
+  }
   const state = {
     lang: ui0.lang || 'ar',
-    theme: ui0.theme || 'night',
+    // Night mode is disabled for now (its accent colors read as washed-out
+    // against the near-black background and this was reported repeatedly),
+    // so the app always boots in day mode regardless of any theme stored
+    // from before. The night CSS variables are left in place untouched so
+    // night mode can be re-enabled later without redoing the color work.
+    theme: 'day',
     accent: ui0.accent || 'indigo',
     screen: 'dashboard',
     history: [],
@@ -5592,9 +5650,21 @@ function renderArchive(root, ctx){
         go(target);
       },
       setLang(l){ setLang(l); },
-      setTheme(th){ setTheme(th); },
       setAccent(a){ setAccent(a); },
       openProfile(entityType, entityId){ openProfile(entityType, entityId); },
+      appInfo(){
+        const isAr = state.lang === 'ar';
+        const dmy = (typeof BUILD_STAMP !== 'undefined') ? BUILD_STAMP.dmy : '';
+        const hm = (typeof BUILD_STAMP !== 'undefined') ? BUILD_STAMP.hm : '';
+        const ver = (typeof BUILD_STAMP !== 'undefined') ? BUILD_STAMP.version : '1.0';
+        return {
+          buildLabel: `GRRK · v${ver}`,
+          lastUpdated: dmy ? (isAr ? `${dmy} الساعة ${hm}` : `${dmy} ${hm}`) : '—',
+          isInstalled: pwa.installed || detectStandalone(),
+          canInstall: !!pwa.deferredEvent,
+        };
+      },
+      promptInstall(){ promptInstall(); },
     };
   }
 
@@ -5746,7 +5816,6 @@ function renderArchive(root, ctx){
     const t = I18N[state.lang];
     const showBack = state.screen === '__profile__' || state.history.length > 0;
     const onHome = state.screen === 'dashboard';
-    const isNight = state.theme === 'night';
     const homeTitle = state.lang==='ar' ? 'العودة للرئيسية' : 'Back to home';
     top.innerHTML = `
       <div class="brand">
@@ -5756,16 +5825,11 @@ function renderArchive(root, ctx){
           <span>${t.appName}</span>
         </button>
       </div>
-      <button id="quickThemeBtn" class="btn ghost sm" style="padding:8px" title="${isNight ? (state.lang==='ar'?'التبديل للنهاري':'Switch to day') : (state.lang==='ar'?'التبديل لليلي':'Switch to night')}">
-        ${isNight ? ICONS.sun : ICONS.moon}
-      </button>
     `;
     const back = document.getElementById('backBtn');
     if(back) back.addEventListener('click', goBack);
     const brandHome = document.getElementById('brandHomeBtn');
     if(brandHome && !onHome) brandHome.addEventListener('click', ()=>{ closeOverlay(); goReset('dashboard'); });
-    const quickTheme = document.getElementById('quickThemeBtn');
-    if(quickTheme) quickTheme.addEventListener('click', ()=>{ setTheme(state.theme === 'night' ? 'day' : 'night'); renderTop(); });
   }
 
   function renderNav(){
@@ -5836,14 +5900,56 @@ function renderArchive(root, ctx){
     state.lang = l; saveUI({lang:state.lang, theme:state.theme, accent:state.accent});
     applyDocAttrs(); renderTop(); renderNav(); renderScreen(state.screen, true);
   }
-  function setTheme(th){
-    state.theme = th; saveUI({lang:state.lang, theme:state.theme, accent:state.accent});
-    applyDocAttrs();
-  }
   function setAccent(a){
     state.accent = a; saveUI({lang:state.lang, theme:state.theme, accent:state.accent});
     applyDocAttrs();
   }
+
+  // ---------------- PWA install banner ----------------
+  function renderInstallBanner(){
+    const existing = document.getElementById('installBanner');
+    const show = !!pwa.deferredEvent && !pwa.installed && !pwa.bannerDismissed && !detectStandalone();
+    if(!show){ if(existing) existing.remove(); return; }
+    const isAr = state.lang === 'ar';
+    let el = existing;
+    if(!el){ el = document.createElement('div'); el.id = 'installBanner'; el.className = 'install-banner'; document.body.appendChild(el); }
+    el.innerHTML = `
+      <span class="ib-icon">${ICONS.dashboard}</span>
+      <span class="ib-text">
+        <span class="ib-title">${isAr ? 'تثبيت تطبيق GRRK' : 'Install GRRK'}</span>
+        <span class="ib-sub">${isAr ? 'للوصول السريع من شاشتك الرئيسية' : 'Quick access from your home screen'}</span>
+      </span>
+      <span class="ib-actions">
+        <button type="button" class="ib-install" id="ibInstallBtn">${isAr ? 'تثبيت' : 'Install'}</button>
+        <button type="button" class="ib-close" id="ibCloseBtn" aria-label="${isAr ? 'إغلاق' : 'Close'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </span>
+    `;
+    document.getElementById('ibInstallBtn').addEventListener('click', promptInstall);
+    document.getElementById('ibCloseBtn').addEventListener('click', ()=>{ pwa.bannerDismissed = true; renderInstallBanner(); });
+  }
+  function promptInstall(){
+    if(!pwa.deferredEvent) return;
+    pwa.deferredEvent.prompt();
+    pwa.deferredEvent.userChoice.then(()=>{ pwa.deferredEvent = null; renderInstallBanner(); if(state.screen==='settings') renderScreen('settings', true); }).catch(()=>{});
+  }
+  function registerServiceWorker(){
+    if(!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* non-fatal: app still works without offline caching */ });
+  }
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    pwa.deferredEvent = e;
+    renderInstallBanner();
+    if(state.screen==='settings') renderScreen('settings', true);
+  });
+  window.addEventListener('appinstalled', ()=>{
+    pwa.installed = true;
+    pwa.deferredEvent = null;
+    renderInstallBanner();
+    if(state.screen==='settings') renderScreen('settings', true);
+  });
 
   // ---------------- Inject module CSS ----------------
   function injectModuleCSS(){
@@ -5859,9 +5965,12 @@ function renderArchive(root, ctx){
   function boot(){
     applyDocAttrs();
     injectModuleCSS();
+    pwa.installed = detectStandalone();
+    registerServiceWorker();
     renderTop();
     renderNav();
     renderScreen('dashboard', true);
+    renderInstallBanner();
   }
   boot();
 })();

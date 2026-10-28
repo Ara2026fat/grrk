@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-28T19:19:58Z', dmy: '28/10/2026', hm: '22:19' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-28T19:38:31Z', dmy: '28/10/2026', hm: '22:38' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -629,6 +629,20 @@ const CSS_DASHBOARD = `
 .dash-cat-card .icon3d svg{ width:29px; height:29px }
 .dash-cat-label{ font-weight:700; font-size:12.5px; text-align:center; line-height:1.3 }
 .dash-cat-sub{ font-size:10.5px; color:var(--ink-faint); text-align:center; margin-top:-5px }
+/* One-tap shortcuts straight into a specific service-request form (or the
+   inbox), right on the home screen — it used to take 4-5 taps buried
+   inside Documents & Monitoring, then another tap to pick the form. */
+.dash-sr-quick{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px }
+@media (min-width:420px){ .dash-sr-quick{ grid-template-columns:repeat(5,1fr) } }
+.dash-sr-quick-card{
+  display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; width:100%; min-width:0;
+  background:var(--flat); border:1px solid var(--flat-line); border-radius:var(--radius-md);
+  padding:14px 6px; transition:transform var(--dur-fast) var(--ease), background var(--dur-base) ease;
+}
+.dash-sr-quick-card:active{ transform:scale(.94); background:var(--glass) }
+.dash-sr-quick-card .icon3d{ width:50px; height:50px; border-radius:15px }
+.dash-sr-quick-card .icon3d svg{ width:23px; height:23px }
+.dash-sr-quick-label{ font-weight:600; font-size:11px; text-align:center; line-height:1.25 }
 `;
 
 // Mount function — called by the shell router.
@@ -747,6 +761,27 @@ function renderDashboard(root, ctx){
         </div>
       </div>
 
+      <div class="dash-section dash-sr-section">
+        <div class="dash-section-head">
+          <h2>${isAr ? 'طلبات الخدمات' : 'Service Requests'}</h2>
+        </div>
+        <div class="dash-sr-quick stagger">
+          ${Object.keys(SR_FORM_DEFS).map(key=>{
+            const f = SR_FORM_DEFS[key];
+            return `
+              <button type="button" class="dash-sr-quick-card" data-sr-jump="form" data-sr-form="${key}">
+                <div class="icon3d" style="--i1:${f.i1};--i2:${f.i2}">${SR_ICONS[f.icon]}</div>
+                <div class="dash-sr-quick-label">${f.labelAr}</div>
+              </button>
+            `;
+          }).join('')}
+          <button type="button" class="dash-sr-quick-card" data-sr-jump="inbox">
+            <div class="icon3d" style="--i1:#B98DD6;--i2:#6E3E92">${SR_ICONS.alerts}</div>
+            <div class="dash-sr-quick-label">${isAr?'صندوق الطلبات':'Inbox'}</div>
+          </button>
+        </div>
+      </div>
+
       <div class="dash-section">
         <div class="dash-section-head">
           <h2>${isAr ? 'الأقسام' : 'Sections'}</h2>
@@ -772,6 +807,17 @@ function renderDashboard(root, ctx){
     </div>
   `;
   // data-nav tiles are wired generically by the shell's wireDataNav() after mount.
+
+  // Service-requests quick icons: stash which one was tapped so the
+  // servicerequests screen opens straight on it (skipping landing/formtype).
+  root.querySelectorAll('[data-sr-jump]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const mode = btn.getAttribute('data-sr-jump');
+      const form = btn.getAttribute('data-sr-form');
+      try{ localStorage.setItem('grrk_sr_jump', JSON.stringify(mode==='form' ? {mode:'form', form} : {mode:'inbox'})); }catch(e){}
+      ctx.navigate('servicerequests');
+    });
+  });
 }
 
 // MODULE: Employees
@@ -5628,6 +5674,23 @@ function renderServiceRequests(root, ctx){
   let wizardData = {};
   let lastRequestId = '';
 
+  // Dashboard shortcut icons jump straight here with a specific form (or the
+  // inbox) pre-selected, skipping landing/formtype — set once by the home
+  // screen, read once, then cleared so a normal re-visit starts at landing.
+  if(configured){
+    try{
+      const jump = JSON.parse(localStorage.getItem('grrk_sr_jump') || 'null');
+      localStorage.removeItem('grrk_sr_jump');
+      if(jump && jump.mode === 'inbox'){
+        view = 'inbox';
+      } else if(jump && jump.mode === 'form' && SR_FORM_DEFS[jump.form]){
+        wizardForm = jump.form;
+        if(session){ wizardStep = 0; wizardData = {}; view = 'wizard'; }
+        else{ view = 'identify'; }
+      }
+    }catch(e){}
+  }
+
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function iconCheck(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`; }
@@ -5751,7 +5814,8 @@ function renderServiceRequests(root, ctx){
         if(res.ok){
           session = { rep_id:res.rep.rep_id, name:res.rep.name, company:res.rep.company };
           srSaveSession(session);
-          view = 'formtype'; paint();
+          if(wizardForm){ wizardStep = 0; wizardData = {}; view = 'wizard'; } else { view = 'formtype'; }
+          paint();
         }else{
           ctx.showToast(isAr?'رقم التسجيل غير موجود':'Registration number not found');
           btn.disabled = false; btn.textContent = isAr?'متابعة':'Continue';
@@ -5800,7 +5864,10 @@ function renderServiceRequests(root, ctx){
               <button class="btn primary block" id="sr-r-continue">${isAr?'متابعة لتقديم الطلب':'Continue to submit'}</button>
             </div>
           `;
-          root.querySelector('#sr-r-continue').addEventListener('click', ()=>{ view='formtype'; paint(); });
+          root.querySelector('#sr-r-continue').addEventListener('click', ()=>{
+            if(wizardForm){ wizardStep = 0; wizardData = {}; view = 'wizard'; } else { view = 'formtype'; }
+            paint();
+          });
         }else{
           ctx.showToast(isAr?'تعذر التسجيل':'Registration failed');
           btn.disabled = false; btn.textContent = isAr?'تسجيل':'Register';

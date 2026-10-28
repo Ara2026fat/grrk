@@ -183,11 +183,17 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .btn.sm{ padding:9px 14px; font-size:13px; width:auto; border-radius:12px }
 .btn.danger{ background:rgba(255,107,129,.14); border-color:rgba(255,107,129,.34); color:var(--danger) }
 .fab{
-  position:fixed; inset-inline-end:20px; bottom:calc(88px + env(safe-area-inset-bottom));
-  width:58px; height:58px; border-radius:50%; display:grid; place-items:center;
+  /* A normal in-flow element (last child, right after the row list) —
+     NOT floating/fixed — so it can never overlap a row's text/badge.
+     margin-inline-start:auto pushes it to the trailing edge, same spot
+     it used to float over; margin-top gives it breathing room from the
+     last row. */
+  display:grid; place-items:center;
+  margin-block:22px 4px; margin-inline-start:auto; margin-inline-end:4px;
+  width:58px; height:58px; border-radius:50%;
   background:linear-gradient(160deg, var(--glow), var(--gold2)); color:#fff; border:none;
   box-shadow:0 14px 30px -8px var(--glow-tint), 0 0 0 1px rgba(255,255,255,.14) inset;
-  cursor:pointer; z-index:40; transition:transform var(--dur-fast) var(--ease);
+  cursor:pointer; z-index:1; transition:transform var(--dur-fast) var(--ease);
 }
 .fab:active{ transform:scale(.92) }
 
@@ -370,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-21T22:06:46Z', dmy: '22/10/2026', hm: '01:06' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-28T19:19:58Z', dmy: '28/10/2026', hm: '22:19' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5466,6 +5472,623 @@ function renderArchive(root, ctx){
   paint();
 }
 
+// MODULE: Service Requests (طلبات الخدمات الحكومية)
+// Digitizes the 5 official RCJY/Ras Al-Khair forms as a guided, step-by-step
+// flow for a representative (مندوب) with no login, routed to an admin inbox.
+// Backend: a Google Apps Script Web App (see ways-of-working notes) reached
+// over plain fetch() — connection details are entered once via the small
+// "ربط النظام" link and kept in localStorage, never hard-coded here.
+
+const CSS_SERVICEREQUESTS = `
+.sr-landing-grid{ display:flex; flex-direction:column; gap:12px; margin-top:4px }
+.sr-big-btn{ display:flex; align-items:center; gap:14px; width:100%; text-align:start; cursor:pointer }
+.sr-big-btn .sr-big-text{ flex:1; min-width:0 }
+.sr-big-btn .sr-big-title{ font-weight:700; font-size:15px }
+.sr-big-btn .sr-big-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
+.sr-config-link{ text-align:center; margin-top:16px; font-size:12.5px; color:var(--ink-faint); cursor:pointer; text-decoration:underline; text-underline-offset:3px }
+.sr-notconfigured{ text-align:center; padding:28px 16px }
+.sr-rep-chip{ display:flex; align-items:center; gap:12px; margin-bottom:16px }
+.sr-rep-chip .sr-rep-text{ flex:1; min-width:0 }
+.sr-rep-name{ font-weight:700; font-size:15px }
+.sr-rep-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
+.sr-formtype-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px }
+.sr-formtype-card{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:20px 10px; cursor:pointer }
+.sr-formtype-card .sr-ft-label{ font-weight:700; font-size:13.5px; line-height:1.4 }
+.sr-progress{ display:flex; gap:6px; justify-content:center; margin-bottom:18px }
+.sr-progress .dot{ width:8px; height:8px; border-radius:50%; background:var(--flat-line); transition:background .2s ease, transform .2s ease }
+.sr-progress .dot.done{ background:var(--glow) }
+.sr-progress .dot.active{ background:var(--glow); transform:scale(1.3) }
+.sr-step-title{ font-family:var(--display); font-weight:700; font-size:19px; margin-bottom:18px; text-align:center }
+.sr-wizard-actions{ display:flex; gap:10px; margin-top:22px }
+.sr-wizard-actions .btn{ flex:1 }
+.sr-big-id{ font-family:var(--display); font-weight:700; font-size:36px; letter-spacing:1px; text-align:center; color:var(--glow); margin:14px 0; font-variant-numeric:tabular-nums }
+.sr-done-icon{ width:68px; height:68px; margin:0 auto 16px; border-radius:22px; display:grid; place-items:center;
+  background:rgba(31,158,99,.15); color:var(--ok) }
+.sr-done-icon svg{ width:34px; height:34px }
+.sr-visitor-row{ display:grid; grid-template-columns:1fr; gap:8px; padding:12px; border-radius:14px; background:var(--flat); border:1px solid var(--flat-line); margin-bottom:10px; position:relative }
+.sr-visitor-row .sr-visitor-remove{ position:absolute; top:8px; inset-inline-end:8px; background:none; border:none; color:var(--danger); cursor:pointer; padding:4px }
+.sr-add-visitor{ width:100%; margin-top:4px }
+.sr-inbox-row{ display:flex; align-items:center; gap:12px; width:100%; text-align:start; cursor:pointer }
+.sr-inbox-row .sr-inbox-text{ flex:1; min-width:0 }
+.sr-inbox-row .sr-inbox-title{ font-weight:700; font-size:14.5px }
+.sr-inbox-row .sr-inbox-sub{ font-size:12px; color:var(--ink-soft); margin-top:2px }
+.sr-status-badge-pending{ background:rgba(255,193,104,.16); color:var(--warn) }
+.sr-status-badge-approved{ background:rgba(31,158,99,.15); color:var(--ok) }
+.sr-status-badge-rejected{ background:rgba(255,107,129,.14); color:var(--danger) }
+.sr-detail-row{ display:flex; justify-content:space-between; gap:10px; padding:10px 2px; border-bottom:1px dashed var(--line); font-size:13.5px }
+.sr-detail-row:last-child{ border-bottom:0 }
+.sr-detail-row .k{ color:var(--ink-soft) }
+.sr-detail-row .v{ font-weight:600; text-align:end }
+.sr-loading{ text-align:center; padding:30px; color:var(--ink-faint); font-size:13.5px }
+`;
+
+// Local icon set — modules run before shell.js, so the shell's own ICONS
+// object (private to its IIFE) isn't reachable here; these are self-contained.
+const SR_ICONS = {
+  servicerequests:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z"/><path d="m9 13 2 2 4-4.3"/></svg>',
+  employees:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg>',
+  alerts:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>',
+  visitors:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 3v3M16 3v3M3.5 10h17"/><path d="m9 15 2 2 4-4"/></svg>',
+};
+
+const SR_CFG_KEY = 'grrk_reqcfg_v1';
+const SR_SESSION_KEY = 'grrk_rep_session_v1';
+
+const SR_DEFAULT_CFG = {
+  url: 'https://script.google.com/macros/s/AKfycbyHSZZ3ZaNP9PuLayeQinDHhtS9PxfhnHD-6_XKka-rNqT0nVw8OSFnxFnEIJRYMQCsaQ/exec',
+  token: 'grrk-vw0m8nmgaj'
+};
+function srLoadCfg(){ try{ const c = JSON.parse(localStorage.getItem(SR_CFG_KEY)); return (c && c.url && c.token) ? c : { ...SR_DEFAULT_CFG }; }catch(e){ return { ...SR_DEFAULT_CFG }; } }
+function srSaveCfg(c){ try{ localStorage.setItem(SR_CFG_KEY, JSON.stringify(c)); }catch(e){} }
+function srLoadSession(){ try{ return JSON.parse(localStorage.getItem(SR_SESSION_KEY)) || null; }catch(e){ return null; } }
+function srSaveSession(s){ try{ localStorage.setItem(SR_SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+function srClearSession(){ try{ localStorage.removeItem(SR_SESSION_KEY); }catch(e){} }
+
+async function srApiPost(url, body){
+  const res = await fetch(url, { method:'POST', body: JSON.stringify(body) });
+  return res.json();
+}
+async function srApiGet(url, params){
+  const qs = Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k]==null?'':params[k])).join('&');
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + qs);
+  return res.json();
+}
+
+const SR_FORM_DEFS = {
+  vehicle_permit: {
+    labelAr:'طلب تصريح مركبة', labelEn:'Vehicle Permit Request', icon:'servicerequests', i1:'#4FA0E0', i2:'#215E8C',
+    steps: [
+      { titleAr:'نوع الطلب', fields:[
+        { key:'requestType', type:'select', labelAr:'نوع الطلب', options:['إصدار','تجديد','بدل تالف / فاقد'] },
+      ]},
+      { titleAr:'نوع المركبة', fields:[
+        { key:'vehicleType', type:'select', labelAr:'نوع المركبة', options:['صالون','شاحنة','باص','بكب','معدة','مقطورة'] },
+      ]},
+      { titleAr:'بيانات المركبة', fields:[
+        { key:'plateNumber', type:'text', labelAr:'رقم اللوحة' },
+        { key:'ownerName', type:'text', labelAr:'اسم مالك المركبة' },
+      ]},
+    ],
+  },
+  badge: {
+    labelAr:'طلب إصدار بطاقة', labelEn:'Badge Request', icon:'employees', i1:'#7FD6A8', i2:'#2E9966',
+    steps: [
+      { titleAr:'نوع البطاقة', fields:[
+        { key:'cardType', type:'select', labelAr:'نوع البطاقة', options:['بطاقة موظف','بطاقة مقاول','بطاقة رجل أمن'] },
+      ]},
+      { titleAr:'نوع الطلب', fields:[
+        { key:'requestType', type:'select', labelAr:'نوع الطلب', options:['إصدار','تجديد','بدل تالف / فاقد','استبدال'] },
+      ]},
+      { titleAr:'بيانات إضافية', fields:[
+        { key:'jobTitle', type:'text', labelAr:'المسمى الوظيفي' },
+        { key:'idNumber', type:'text', labelAr:'رقم الهوية / الإقامة' },
+      ]},
+    ],
+  },
+  loss_report: {
+    labelAr:'بلاغ فقدان', labelEn:'Loss Report', icon:'alerts', i1:'#FFC168', i2:'#B4790F',
+    steps: [
+      { titleAr:'ما الذي فُقد؟', fields:[
+        { key:'lostItemType', type:'select', labelAr:'نوع المفقود', options:['بطاقة','تصريح مركبة'] },
+      ]},
+      { titleAr:'تفاصيل الفقدان', fields:[
+        { key:'lostItemNumber', type:'text', labelAr:'رقم البطاقة / التصريح (إن وجد)' },
+        { key:'lossDate', type:'date', labelAr:'تاريخ الفقدان' },
+      ]},
+    ],
+  },
+  visit_request: {
+    labelAr:'طلب زيارة', labelEn:'Visit Request', icon:'visitors', i1:'#E0A86F', i2:'#A86F2E',
+    steps: [
+      { titleAr:'موعد الزيارة', fields:[
+        { key:'visitStart', type:'date', labelAr:'تاريخ بداية الزيارة' },
+        { key:'visitEnd', type:'date', labelAr:'تاريخ نهاية الزيارة' },
+      ]},
+      { titleAr:'الغرض من الزيارة', fields:[
+        { key:'visitPurpose', type:'textarea', labelAr:'الغرض من الزيارة' },
+      ]},
+      { titleAr:'قائمة الزوار', fields:[
+        { key:'visitors', type:'visitorsTable', labelAr:'الزوار' },
+      ]},
+    ],
+  },
+};
+
+function renderServiceRequests(root, ctx){
+  const isAr = ctx.lang === 'ar';
+  const t = ctx.t;
+
+  const cfg = srLoadCfg();
+  const configured = !!(cfg.url && cfg.token);
+
+  let view = 'landing';   // landing | identify | register | formtype | wizard | done | inbox | config
+  let session = srLoadSession();
+  let wizardForm = null;
+  let wizardStep = 0;
+  let wizardData = {};
+  let lastRequestId = '';
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function iconCheck(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`; }
+  function iconArrow(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`; }
+  function iconInbox(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 7.5 12 3l8.5 4.5V19a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 19Z"/><path d="M3.5 7.5 9 13h6l5.5-5.5"/></svg>`; }
+  function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>`; }
+
+  function paint(){
+    if(!configured && view !== 'config'){
+      paintNotConfigured();
+      return;
+    }
+    if(view === 'landing') return paintLanding();
+    if(view === 'identify') return paintIdentify();
+    if(view === 'register') return paintRegister();
+    if(view === 'formtype') return paintFormType();
+    if(view === 'wizard') return paintWizard();
+    if(view === 'done') return paintDone();
+    if(view === 'inbox') return paintInbox();
+    if(view === 'config') return paintConfig();
+  }
+
+  function paintNotConfigured(){
+    root.innerHTML = `
+      <div class="glass sr-notconfigured">
+        <div class="eyebrow">${isAr?'طلبات الخدمات':'Service Requests'}</div>
+        <p class="muted" style="margin-top:10px">${isAr
+          ? 'النظام غير مرتبط بالخلفية بعد. هذه الخطوة تخص الإدارة فقط.'
+          : 'The backend connection has not been set up yet. This step is for the admin only.'}</p>
+        <button class="btn primary" id="sr-goto-config" style="margin-top:16px">${isAr?'إعداد الربط':'Set up connection'}</button>
+      </div>
+    `;
+    root.querySelector('#sr-goto-config').addEventListener('click', ()=>{ view='config'; paint(); });
+  }
+
+  function paintConfig(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:16px">
+        <div class="eyebrow">${isAr?'إعداد ربط النظام':'Connection setup'}</div>
+        <p class="muted" style="margin-top:8px">${isAr
+          ? 'الصق هنا رابط Web App والرمز السري اللي حطيته في كود Google Apps Script.'
+          : 'Paste the Web App URL and the shared token from the Google Apps Script code.'}</p>
+      </div>
+      <div class="card">
+        <div class="field"><label>Web App URL</label><input type="text" id="sr-cfg-url" dir="ltr" value="${esc(cfg.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
+        <div class="field"><label>Token</label><input type="text" id="sr-cfg-token" dir="ltr" value="${esc(cfg.token||'')}"></div>
+        <button class="btn primary block" id="sr-cfg-save">${isAr?'حفظ':'Save'}</button>
+        ${configured ? `<button class="btn ghost block" id="sr-cfg-back" style="margin-top:10px">${isAr?'رجوع':'Back'}</button>` : ''}
+      </div>
+    `;
+    root.querySelector('#sr-cfg-save').addEventListener('click', ()=>{
+      const url = root.querySelector('#sr-cfg-url').value.trim();
+      const token = root.querySelector('#sr-cfg-token').value.trim();
+      if(!url || !token){ ctx.showToast(isAr?'عبّئ الحقلين':'Fill both fields'); return; }
+      srSaveCfg({url, token});
+      ctx.showToast(isAr?'تم الحفظ':'Saved');
+      view = 'landing';
+      paint();
+    });
+    const back = root.querySelector('#sr-cfg-back');
+    if(back) back.addEventListener('click', ()=>{ view='landing'; paint(); });
+  }
+
+  function paintLanding(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:16px">
+        <div class="eyebrow">${isAr?'طلبات الخدمات':'Service Requests'}</div>
+        <p class="muted" style="margin-top:8px">${isAr
+          ? 'تصاريح المركبات، البطاقات، بلاغات الفقدان، وطلبات الزيارة — من مكان واحد.'
+          : 'Vehicle permits, badges, loss reports and visit requests — all in one place.'}</p>
+      </div>
+      <div class="sr-landing-grid">
+        <button type="button" class="card pressable sr-big-btn" id="sr-go-submit">
+          <span class="icon3d" style="--i1:#4FA0E0;--i2:#215E8C">${SR_ICONS.servicerequests}</span>
+          <span class="sr-big-text">
+            <span class="sr-big-title">${isAr?'تقديم طلب جديد':'Submit a new request'}</span>
+            <span class="sr-big-sub">${isAr?'للمناديب والموظفين':'For representatives & employees'}</span>
+          </span>
+          <span>${iconArrow()}</span>
+        </button>
+        <button type="button" class="card pressable sr-big-btn" id="sr-go-inbox">
+          <span class="icon3d" style="--i1:#B48CE8;--i2:#6B3FA8">${iconInbox()}</span>
+          <span class="sr-big-text">
+            <span class="sr-big-title">${isAr?'صندوق الطلبات':'Requests inbox'}</span>
+            <span class="sr-big-sub">${isAr?'مراجعة واعتماد الطلبات الواردة':'Review & approve incoming requests'}</span>
+          </span>
+          <span>${iconArrow()}</span>
+        </button>
+      </div>
+      <div class="sr-config-link" id="sr-go-config">${isAr?'إعداد الربط':'Connection setup'}</div>
+    `;
+    root.querySelector('#sr-go-submit').addEventListener('click', ()=>{
+      view = session ? 'formtype' : 'identify';
+      paint();
+    });
+    root.querySelector('#sr-go-inbox').addEventListener('click', ()=>{ view='inbox'; paint(); });
+    root.querySelector('#sr-go-config').addEventListener('click', ()=>{ view='config'; paint(); });
+  }
+
+  function paintIdentify(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:16px">
+        <div class="eyebrow">${isAr?'تقديم طلب':'Submit a request'}</div>
+        <p class="muted" style="margin-top:8px">${isAr?'عندك رقم تسجيل سابق؟':'Do you already have a registration number?'}</p>
+      </div>
+      <div class="card">
+        <div class="field"><label>${isAr?'رقم التسجيل (مثال: MND-0001)':'Registration number (e.g. MND-0001)'}</label>
+          <input type="text" id="sr-id-input" dir="ltr" placeholder="MND-0001">
+        </div>
+        <button class="btn primary block" id="sr-id-check">${isAr?'متابعة':'Continue'}</button>
+      </div>
+      <button class="btn ghost block" id="sr-id-new" style="margin-top:12px">${isAr?'ليس عندي رقم — تسجيل جديد':"I don't have one — register"}</button>
+    `;
+    root.querySelector('#sr-id-check').addEventListener('click', async ()=>{
+      const repId = root.querySelector('#sr-id-input').value.trim();
+      if(!repId){ ctx.showToast(isAr?'اكتب رقم التسجيل':'Enter the registration number'); return; }
+      const btn = root.querySelector('#sr-id-check');
+      btn.disabled = true; btn.textContent = isAr?'جار التحقق...':'Checking...';
+      try{
+        const res = await srApiGet(cfg.url, { token:cfg.token, action:'get_rep', rep_id:repId });
+        if(res.ok){
+          session = { rep_id:res.rep.rep_id, name:res.rep.name, company:res.rep.company };
+          srSaveSession(session);
+          view = 'formtype'; paint();
+        }else{
+          ctx.showToast(isAr?'رقم التسجيل غير موجود':'Registration number not found');
+          btn.disabled = false; btn.textContent = isAr?'متابعة':'Continue';
+        }
+      }catch(e){
+        ctx.showToast(isAr?'تعذر الاتصال، حاول مرة أخرى':'Connection failed, try again');
+        btn.disabled = false; btn.textContent = isAr?'متابعة':'Continue';
+      }
+    });
+    root.querySelector('#sr-id-new').addEventListener('click', ()=>{ view='register'; paint(); });
+  }
+
+  function paintRegister(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:16px">
+        <div class="eyebrow">${isAr?'تسجيل جديد':'New registration'}</div>
+        <p class="muted" style="margin-top:8px">${isAr?'بيانات بسيطة، مرة وحدة فقط':'Just the basics, once only'}</p>
+      </div>
+      <div class="card">
+        <div class="field"><label>${isAr?'الاسم':'Name'}</label><input type="text" id="sr-r-name"></div>
+        <div class="field"><label>${isAr?'الشركة / الجهة':'Company / Entity'}</label><input type="text" id="sr-r-company"></div>
+        <div class="field"><label>${isAr?'رقم الجوال':'Mobile number'}</label><input type="tel" id="sr-r-phone" dir="ltr"></div>
+        <div class="field"><label>${isAr?'البريد الإلكتروني':'Email'}</label><input type="email" id="sr-r-email" dir="ltr"></div>
+        <button class="btn primary block" id="sr-r-submit">${isAr?'تسجيل':'Register'}</button>
+      </div>
+    `;
+    root.querySelector('#sr-r-submit').addEventListener('click', async ()=>{
+      const name = root.querySelector('#sr-r-name').value.trim();
+      const company = root.querySelector('#sr-r-company').value.trim();
+      const phone = root.querySelector('#sr-r-phone').value.trim();
+      const email = root.querySelector('#sr-r-email').value.trim();
+      if(!name || !phone){ ctx.showToast(isAr?'الاسم والجوال مطلوبان':'Name and phone are required'); return; }
+      const btn = root.querySelector('#sr-r-submit');
+      btn.disabled = true; btn.textContent = isAr?'جار التسجيل...':'Registering...';
+      try{
+        const res = await srApiPost(cfg.url, { token:cfg.token, action:'register_rep', name, company, phone, email });
+        if(res.ok){
+          session = { rep_id:res.rep_id, name, company };
+          srSaveSession(session);
+          root.innerHTML = `
+            <div class="glass" style="text-align:center">
+              <div class="sr-done-icon">${iconCheck()}</div>
+              <div class="h2">${isAr?'تم التسجيل بنجاح':'Registered successfully'}</div>
+              <div class="muted" style="margin-top:6px">${isAr?'رقمك الخاص':'Your registration number'}</div>
+              <div class="sr-big-id">${esc(res.rep_id)}</div>
+              <button class="btn primary block" id="sr-r-continue">${isAr?'متابعة لتقديم الطلب':'Continue to submit'}</button>
+            </div>
+          `;
+          root.querySelector('#sr-r-continue').addEventListener('click', ()=>{ view='formtype'; paint(); });
+        }else{
+          ctx.showToast(isAr?'تعذر التسجيل':'Registration failed');
+          btn.disabled = false; btn.textContent = isAr?'تسجيل':'Register';
+        }
+      }catch(e){
+        ctx.showToast(isAr?'تعذر الاتصال':'Connection failed');
+        btn.disabled = false; btn.textContent = isAr?'تسجيل':'Register';
+      }
+    });
+  }
+
+  function paintFormType(){
+    root.innerHTML = `
+      <div class="glass sr-rep-chip">
+        <span class="icon3d sm" style="--i1:var(--glow);--i2:var(--gold2)">${SR_ICONS.employees}</span>
+        <span class="sr-rep-text">
+          <span class="sr-rep-name">${esc(session.name||'')}</span>
+          <span class="sr-rep-sub">${esc(session.rep_id)} ${session.company?('· '+esc(session.company)):''}</span>
+        </span>
+      </div>
+      <div class="sr-formtype-grid">
+        ${Object.keys(SR_FORM_DEFS).map(key=>{
+          const f = SR_FORM_DEFS[key];
+          return `
+            <button type="button" class="card pressable sr-formtype-card" data-form="${key}">
+              <span class="icon3d" style="--i1:${f.i1};--i2:${f.i2}">${SR_ICONS[f.icon]}</span>
+              <span class="sr-ft-label">${esc(f.labelAr)}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <button class="btn ghost block" id="sr-ft-switch" style="margin-top:16px">${isAr?'لست أنا — تبديل الحساب':"Not me — switch account"}</button>
+    `;
+    root.querySelectorAll('[data-form]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        wizardForm = btn.getAttribute('data-form');
+        wizardStep = 0;
+        wizardData = {};
+        view = 'wizard';
+        paint();
+      });
+    });
+    root.querySelector('#sr-ft-switch').addEventListener('click', ()=>{
+      srClearSession(); session = null; view = 'identify'; paint();
+    });
+  }
+
+  function renderFieldInput(f){
+    const val = wizardData[f.key];
+    if(f.type === 'select'){
+      return `
+        <div class="field">
+          <label>${esc(f.labelAr)}</label>
+          <select id="sr-f-${f.key}">
+            <option value="" disabled ${!val?'selected':''}>${isAr?'اختر...':'Select...'}</option>
+            ${f.options.map(o=>`<option value="${esc(o)}" ${val===o?'selected':''}>${esc(o)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+    if(f.type === 'textarea'){
+      return `<div class="field"><label>${esc(f.labelAr)}</label><textarea id="sr-f-${f.key}" rows="4">${esc(val||'')}</textarea></div>`;
+    }
+    if(f.type === 'date'){
+      return `<div class="field"><label>${esc(f.labelAr)}</label><input type="date" id="sr-f-${f.key}" value="${esc(val||'')}"></div>`;
+    }
+    return `<div class="field"><label>${esc(f.labelAr)}</label><input type="text" id="sr-f-${f.key}" value="${esc(val||'')}"></div>`;
+  }
+
+  function renderVisitorsTable(){
+    if(!Array.isArray(wizardData.visitors) || wizardData.visitors.length === 0){
+      wizardData.visitors = [{ name:'', nationality:'', idNumber:'' }];
+    }
+    return `
+      <div id="sr-visitors-wrap">
+        ${wizardData.visitors.map((v,i)=>`
+          <div class="sr-visitor-row">
+            ${wizardData.visitors.length > 1 ? `<button type="button" class="sr-visitor-remove" data-rm="${i}">${iconTrash()}</button>` : ''}
+            <div class="field" style="margin-bottom:6px"><label>${isAr?`اسم الزائر ${i+1}`:`Visitor ${i+1} name`}</label><input type="text" class="sr-v-name" data-idx="${i}" value="${esc(v.name)}"></div>
+            <div class="field" style="margin-bottom:6px"><label>${isAr?'الجنسية':'Nationality'}</label><input type="text" class="sr-v-nat" data-idx="${i}" value="${esc(v.nationality)}"></div>
+            <div class="field" style="margin-bottom:0"><label>${isAr?'رقم الهوية / الإقامة / الجواز':'ID / Iqama / Passport No.'}</label><input type="text" class="sr-v-id" data-idx="${i}" dir="ltr" value="${esc(v.idNumber)}"></div>
+          </div>
+        `).join('')}
+      </div>
+      <button type="button" class="btn ghost sr-add-visitor" id="sr-add-visitor">${isAr?'+ إضافة زائر':'+ Add visitor'}</button>
+    `;
+  }
+
+  function wireVisitorsTable(){
+    const wrap = root.querySelector('#sr-visitors-wrap');
+    if(!wrap) return;
+    root.querySelectorAll('.sr-v-name').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].name = e.target.value; }));
+    root.querySelectorAll('.sr-v-nat').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].nationality = e.target.value; }));
+    root.querySelectorAll('.sr-v-id').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].idNumber = e.target.value; }));
+    root.querySelectorAll('[data-rm]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        wizardData.visitors.splice(+btn.getAttribute('data-rm'), 1);
+        paintWizard();
+      });
+    });
+    const addBtn = root.querySelector('#sr-add-visitor');
+    if(addBtn){
+      addBtn.addEventListener('click', ()=>{
+        if(wizardData.visitors.length >= 10){ ctx.showToast(isAr?'الحد الأقصى 10 زوار':'Maximum 10 visitors'); return; }
+        wizardData.visitors.push({ name:'', nationality:'', idNumber:'' });
+        paintWizard();
+      });
+    }
+  }
+
+  function collectStepValues(step){
+    step.fields.forEach(f=>{
+      if(f.type === 'visitorsTable') return;
+      const el = root.querySelector('#sr-f-'+f.key);
+      if(el) wizardData[f.key] = el.value;
+    });
+  }
+
+  function paintWizard(){
+    const def = SR_FORM_DEFS[wizardForm];
+    const steps = def.steps;
+    const step = steps[wizardStep];
+    const isLast = wizardStep === steps.length - 1;
+
+    root.innerHTML = `
+      <div class="glass">
+        <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>
+        <div class="sr-progress" style="margin-top:14px">
+          ${steps.map((s,i)=>`<span class="dot ${i<wizardStep?'done':(i===wizardStep?'active':'')}"></span>`).join('')}
+        </div>
+        <div class="sr-step-title">${esc(step.titleAr||'')}</div>
+        ${step.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
+        <div class="sr-wizard-actions">
+          ${wizardStep>0 ? `<button class="btn ghost" id="sr-w-back">${isAr?'السابق':'Back'}</button>` : `<button class="btn ghost" id="sr-w-cancel">${isAr?'إلغاء':'Cancel'}</button>`}
+          <button class="btn primary" id="sr-w-next">${isLast?(isAr?'إرسال الطلب':'Submit'):(isAr?'التالي':'Next')}</button>
+        </div>
+      </div>
+    `;
+    wireVisitorsTable();
+
+    const backBtn = root.querySelector('#sr-w-back');
+    if(backBtn) backBtn.addEventListener('click', ()=>{ collectStepValues(step); wizardStep--; paint(); });
+    const cancelBtn = root.querySelector('#sr-w-cancel');
+    if(cancelBtn) cancelBtn.addEventListener('click', ()=>{ view='formtype'; paint(); });
+
+    root.querySelector('#sr-w-next').addEventListener('click', async ()=>{
+      collectStepValues(step);
+      if(!isLast){ wizardStep++; paint(); return; }
+      const btn = root.querySelector('#sr-w-next');
+      btn.disabled = true; btn.textContent = isAr?'جار الإرسال...':'Submitting...';
+      try{
+        const res = await srApiPost(cfg.url, {
+          token: cfg.token,
+          form_type: wizardForm,
+          rep_id: session.rep_id,
+          submitter_type: 'rep',
+          payload: wizardData,
+        });
+        if(res.ok){
+          lastRequestId = res.id;
+          view = 'done';
+          paint();
+        }else{
+          ctx.showToast(isAr?'تعذر إرسال الطلب':'Failed to submit');
+          btn.disabled = false; btn.textContent = isAr?'إرسال الطلب':'Submit';
+        }
+      }catch(e){
+        ctx.showToast(isAr?'تعذر الاتصال':'Connection failed');
+        btn.disabled = false; btn.textContent = isAr?'إرسال الطلب':'Submit';
+      }
+    });
+  }
+
+  function paintDone(){
+    root.innerHTML = `
+      <div class="glass" style="text-align:center">
+        <div class="sr-done-icon">${iconCheck()}</div>
+        <div class="h2">${isAr?'تم استلام طلبك':'Your request was received'}</div>
+        <div class="muted" style="margin-top:6px">${isAr?'رقم الطلب':'Request number'}</div>
+        <div class="sr-big-id">${esc(lastRequestId)}</div>
+        <p class="muted" style="margin-top:6px">${isAr?'راح يوصلك إيميل فور مراجعته':"You'll get an email once it's reviewed"}</p>
+        <button class="btn primary block" id="sr-done-another" style="margin-top:16px">${isAr?'تقديم طلب آخر':'Submit another request'}</button>
+        <button class="btn ghost block" id="sr-done-home" style="margin-top:10px">${isAr?'الرئيسية':'Home'}</button>
+      </div>
+    `;
+    root.querySelector('#sr-done-another').addEventListener('click', ()=>{ view='formtype'; paint(); });
+    root.querySelector('#sr-done-home').addEventListener('click', ()=>{ view='landing'; paint(); });
+  }
+
+  const SR_STATUS_LABEL = { 'قيد المراجعة': isAr?'قيد المراجعة':'Pending', 'معتمد': isAr?'معتمد':'Approved', 'مرفوض': isAr?'مرفوض':'Rejected' };
+  function statusClass(s){
+    if(s === 'معتمد') return 'sr-status-badge-approved';
+    if(s === 'مرفوض') return 'sr-status-badge-rejected';
+    return 'sr-status-badge-pending';
+  }
+
+  async function paintInbox(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:14px">
+        <div class="eyebrow">${isAr?'صندوق الطلبات':'Requests inbox'}</div>
+      </div>
+      <div class="sr-loading" id="sr-inbox-loading">${isAr?'جار التحميل...':'Loading...'}</div>
+    `;
+    try{
+      const res = await srApiGet(cfg.url, { token:cfg.token, action:'list' });
+      if(!res.ok){ root.querySelector('#sr-inbox-loading').textContent = isAr?'تعذر التحميل':'Failed to load'; return; }
+      const items = (res.requests||[]).sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
+      if(items.length === 0){
+        root.querySelector('#sr-inbox-loading').outerHTML = `<div class="empty">${isAr?'لا توجد طلبات بعد':'No requests yet'}</div>`;
+        return;
+      }
+      root.querySelector('#sr-inbox-loading').outerHTML = `
+        <div class="sr-inbox-list stagger" style="display:flex;flex-direction:column;gap:10px">
+          ${items.map((r,i)=>{
+            const def = SR_FORM_DEFS[r.form_type];
+            const label = def ? def.labelAr : r.form_type;
+            return `
+              <button type="button" class="card pressable sr-inbox-row" data-idx="${i}">
+                <span class="icon3d sm" style="--i1:${def?def.i1:'var(--glow)'};--i2:${def?def.i2:'var(--gold2)'}">${def?SR_ICONS[def.icon]:SR_ICONS.servicerequests}</span>
+                <span class="sr-inbox-text">
+                  <span class="sr-inbox-title">${esc(label)} — ${esc(r.submitter_name)}</span>
+                  <span class="sr-inbox-sub">${esc(r.id)}</span>
+                </span>
+                <span class="badge ${statusClass(r.status)}">${esc(SR_STATUS_LABEL[r.status]||r.status)}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+      root.querySelectorAll('[data-idx]').forEach(btn=>{
+        btn.addEventListener('click', ()=> openInboxDetail(items[+btn.getAttribute('data-idx')]));
+      });
+    }catch(e){
+      root.querySelector('#sr-inbox-loading').textContent = isAr?'تعذر الاتصال':'Connection failed';
+    }
+  }
+
+  function openInboxDetail(r){
+    const def = SR_FORM_DEFS[r.form_type];
+    const label = def ? def.labelAr : r.form_type;
+    const payload = r.payload || {};
+    const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>({k, v:payload[k]}));
+    const visitorsHtml = Array.isArray(payload.visitors) ? payload.visitors.map((v,i)=>`
+      <div class="sr-detail-row"><span class="k">${isAr?'زائر':'Visitor'} ${i+1}</span><span class="v">${esc(v.name)} — ${esc(v.nationality)} — ${esc(v.idNumber)}</span></div>
+    `).join('') : '';
+    const html = `
+      <div class="sheet glass">
+        <div class="h2" style="margin-bottom:4px">${esc(label)}</div>
+        <div class="muted" style="margin-bottom:14px">${esc(r.id)}</div>
+        <div class="sr-detail-row"><span class="k">${isAr?'مقدّم الطلب':'Submitter'}</span><span class="v">${esc(r.submitter_name)}</span></div>
+        <div class="sr-detail-row"><span class="k">${isAr?'الجهة/الشركة':'Company'}</span><span class="v">${esc(r.company||'-')}</span></div>
+        <div class="sr-detail-row"><span class="k">${isAr?'الجوال':'Phone'}</span><span class="v">${esc(r.submitter_phone||'-')}</span></div>
+        ${rows.map(x=>`<div class="sr-detail-row"><span class="k">${esc(x.k)}</span><span class="v">${esc(x.v)}</span></div>`).join('')}
+        ${visitorsHtml}
+        <div class="sr-detail-row"><span class="k">${isAr?'الحالة':'Status'}</span><span class="v"><span class="badge ${statusClass(r.status)}">${esc(SR_STATUS_LABEL[r.status]||r.status)}</span></span></div>
+        ${r.status === 'قيد المراجعة' ? `
+          <div class="sr-wizard-actions">
+            <button class="btn danger" id="sr-reject-btn">${isAr?'رفض':'Reject'}</button>
+            <button class="btn primary" id="sr-approve-btn">${isAr?'اعتماد':'Approve'}</button>
+          </div>
+        ` : ''}
+        <button class="btn ghost block" id="sr-detail-close" style="margin-top:10px">${isAr?'إغلاق':'Close'}</button>
+      </div>
+    `;
+    ctx.openOverlay(html, (overlayEl)=>{
+      overlayEl.querySelector('#sr-detail-close').addEventListener('click', ()=> ctx.closeOverlay());
+      const approveBtn = overlayEl.querySelector('#sr-approve-btn');
+      const rejectBtn = overlayEl.querySelector('#sr-reject-btn');
+      async function updateStatus(newStatus){
+        try{
+          const res = await srApiPost(cfg.url, { token:cfg.token, action:'update_status', id:r.id, new_status:newStatus });
+          if(res.ok){
+            ctx.showToast(isAr?'تم التحديث':'Updated');
+            ctx.closeOverlay();
+            paintInbox();
+          }else{
+            ctx.showToast(isAr?'تعذر التحديث':'Update failed');
+          }
+        }catch(e){ ctx.showToast(isAr?'تعذر الاتصال':'Connection failed'); }
+      }
+      if(approveBtn) approveBtn.addEventListener('click', ()=> updateStatus('معتمد'));
+      if(rejectBtn) rejectBtn.addEventListener('click', ()=> updateStatus('مرفوض'));
+    });
+  }
+
+  paint();
+}
+
 /* ============================================================
    GRRK — App Shell (router, i18n/theme state, overlay/toast,
    bottom nav with 3D icons, screen transitions)
@@ -5541,6 +6164,9 @@ function renderArchive(root, ctx){
     library:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9.2"/><path d="M10 8.3v7.4l6-3.7-6-3.7Z" fill="currentColor" stroke="none"/></svg>',
     forms:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="m9.5 13.5 1.6 1.6 3.4-3.6"/></svg>',
     archive:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M4.5 9v8a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>',
+    // Clipboard-with-checkmark — government service requests (permits,
+    // badges, loss reports, visit requests) and the admin review inbox.
+    servicerequests:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z"/><path d="m9 13 2 2 4-4.3"/></svg>',
     more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>',
     chevronBack:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>',
     sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>',
@@ -5574,6 +6200,7 @@ function renderArchive(root, ctx){
       {key:'documents', i1:'#C2524F', i2:'#8C2E2E'},
       {key:'reports', i1:'#B48CE8', i2:'#6B3FA8'},
       {key:'alerts', i1:'#FFC168', i2:'#B4790F'},
+      {key:'servicerequests', i1:'#4FA0E0', i2:'#215E8C'},
     ]},
     { key:'resources', labelAr:'الموارد والمحتوى', labelEn:'Resources & Content', bigIcon:'archive', bigI1:'#C9A45C', bigI2:'#8A6416', items:[
       {key:'library', i1:'#5FB8D9', i2:'#2E7F9C'},
@@ -5596,6 +6223,7 @@ function renderArchive(root, ctx){
       forms: n('forms') + (isAr ? ' نموذج' : ' forms'),
       archive: n('archiveItems') + (isAr ? ' عنصر' : ' items'),
       alerts: isAr ? 'رصد المخاطر' : 'Risk monitoring',
+      servicerequests: isAr ? 'تصاريح وبطاقات وزيارات' : 'Permits, badges & visits',
     };
     return map[key] || '';
   }
@@ -5609,6 +6237,7 @@ function renderArchive(root, ctx){
       library: state.lang==='ar' ? 'المكتبة' : 'Library',
       forms: state.lang==='ar' ? 'النماذج' : 'Forms',
       archive: state.lang==='ar' ? 'الأرشيف' : 'Archive',
+      servicerequests: state.lang==='ar' ? 'طلبات الخدمات' : 'Service Requests',
       settings:t.settings,
       more: state.lang==='ar' ? 'الأقسام' : 'Sections',
     };
@@ -5689,6 +6318,7 @@ function renderArchive(root, ctx){
     library: (root, ctx)=> renderLibrary(root, ctx),
     forms: (root, ctx)=> renderForms(root, ctx),
     archive: (root, ctx)=> renderArchive(root, ctx),
+    servicerequests: (root, ctx)=> renderServiceRequests(root, ctx),
     // The Sections hub and its 3 category screens are real screens (not a
     // modal sheet) so every level gets a proper, working back button and
     // never crams more than a handful of icons onto one screen.
@@ -5968,7 +6598,7 @@ function renderArchive(root, ctx){
     styleEl.id = 'moduleStyles';
     styleEl.textContent = [CSS_DASHBOARD, CSS_EMPLOYEES, CSS_CONTRACTORS, CSS_VISITORS, CSS_COMPANIESORGS,
       CSS_DOCUMENTS, CSS_ALERTS, CSS_REPORTS, CSS_SETTINGS, CSS_PROFILE,
-      CSS_LIBRARY, CSS_FORMS, CSS_ARCHIVE].join('\n');
+      CSS_LIBRARY, CSS_FORMS, CSS_ARCHIVE, CSS_SERVICEREQUESTS].join('\n');
     document.head.appendChild(styleEl);
   }
 

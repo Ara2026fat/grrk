@@ -410,17 +410,132 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
     <div class="main" id="main"></div>
   </div>
   <script>
-// GRRK — Public request page for representatives/employees (no admin data).
-// Trimmed copy of modules/service-requests.js: only identify/register/
-// formtype/wizard/done. No landing choice, no inbox, no connection-config
-// screen — this page has exactly one job, and starts there immediately.
-
 const SR_ICONS = {
   servicerequests:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z"/><path d="m9 13 2 2 4-4.3"/></svg>',
   employees:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg>',
   alerts:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>',
   visitors:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 3v3M16 3v3M3.5 10h17"/><path d="m9 15 2 2 4-4"/></svg>',
 };
+
+const SR_FORM_DEFS = {
+  vehicle_permit: {
+    labelAr:'طلب إصدار تصريح مركبة', labelEn:'Vehicle Permit Request', icon:'servicerequests', i1:'#4FA0E0', i2:'#215E8C',
+    steps: [
+      { titleAr:'بيانات مقدم الطلب', fields:[
+        { key:'entityType', type:'select', labelAr:'الجهة', options:['مدينة رأس الخير للصناعات التعدينية','جهة حكومية','شركة / مؤسسة'] },
+        { key:'employeeName', type:'text', labelAr:'اسم الموظف / الجهة' },
+        { key:'employeeNumber', type:'text', labelAr:'رقم الموظف' },
+      ]},
+      { titleAr:'نوع الطلب', fields:[
+        { key:'requestType', type:'select', labelAr:'التصريح', options:['إصدار','تجديد','بدل تالف / فاقد'] },
+        { key:'vehicleType', type:'select', labelAr:'نوع المركبة', options:['صالون','شاحنة','بكب','حافلة','معدة','مقطورة'] },
+      ]},
+      { titleAr:'بيانات المركبة', fields:[
+        { key:'ownerName', type:'text', labelAr:'اسم المالك' },
+        { key:'plateNumber', type:'text', labelAr:'رقم اللوحة' },
+        { key:'chassisNumber', type:'text', labelAr:'رقم الهيكل' },
+        { key:'vehicleModel', type:'text', labelAr:'الموديل' },
+        { key:'vehicleColor', type:'text', labelAr:'اللون' },
+      ]},
+      { titleAr:'بيانات الاستمارة', fields:[
+        { key:'licenseNumber', type:'text', labelAr:'رقم الرخصة (الاستمارة)' },
+        { key:'issueDate', type:'date', labelAr:'تاريخ الإصدار' },
+        { key:'inspectionExpiry', type:'date', labelAr:'تاريخ إنتهاء الفحص الدوري' },
+      ]},
+      { titleAr:'العقد والتصريح السابق (إن وجد)', fields:[
+        { key:'contractNumber', type:'text', labelAr:'رقم العقد' },
+        { key:'contractExpiry', type:'date', labelAr:'تاريخ إنتهاء العقد' },
+        { key:'previousPermitNumber', type:'text', labelAr:'رقم التصريح السابق' },
+        { key:'previousPermitExpiry', type:'date', labelAr:'تاريخ إنتهاء التصريح السابق' },
+      ]},
+    ],
+  },
+  badge: {
+    labelAr:'طلب إصدار بطاقة', labelEn:'Badge Request', icon:'employees', i1:'#7FD6A8', i2:'#2E9966',
+    steps: [
+      { titleAr:'جهة مقدم الطلب', fields:[
+        { key:'entityType', type:'select', labelAr:'الجهة', options:['مدينة رأس الخير للصناعات التعدينية','جهة حكومية','شركة / مؤسسة'] },
+        { key:'entityName', type:'text', labelAr:'اسم الإدارة / الجهة' },
+        { key:'departmentNumber', type:'text', labelAr:'رقم الإدارة' },
+      ]},
+      { titleAr:'نوع الطلب', fields:[
+        { key:'employeeType', type:'select', labelAr:'الموظف', options:['رسمي','مؤقت','متدرب'] },
+        { key:'requestType', type:'select', labelAr:'البطاقة', options:['إصدار','تجديد','استبدال','بدل تالف / فاقد'] },
+        { key:'cardType', type:'select', labelAr:'نوع البطاقة', options:['بطاقة موظفي مدينة رأس الخير','بطاقة الشركات','بطاقة رجل أمن'] },
+      ]},
+      { titleAr:'البيانات الشخصية', fields:[
+        { key:'fullName', type:'text', labelAr:'الاسم' },
+        { key:'employeeNumber', type:'text', labelAr:'الرقم الوظيفي' },
+        { key:'bloodType', type:'select', labelAr:'فصيلة الدم', options:['A+','A-','B+','B-','AB+','AB-','O+','O-'] },
+        { key:'jobTitle', type:'text', labelAr:'مسمى الوظيفة' },
+        { key:'dob', type:'date', labelAr:'تاريخ الميلاد' },
+        { key:'nationality', type:'text', labelAr:'الجنسية' },
+      ]},
+      { titleAr:'الهوية والعقد', fields:[
+        { key:'idNumber', type:'text', labelAr:'رقم البطاقة المدنية / الإقامة' },
+        { key:'issuePlace', type:'text', labelAr:'مكان الإصدار' },
+        { key:'issueDate', type:'date', labelAr:'تاريخ الإصدار' },
+        { key:'expiryDate', type:'date', labelAr:'تاريخ الانتهاء' },
+        { key:'contractNumber', type:'text', labelAr:'رقم العقد (إن وجد)' },
+        { key:'contractExpiry', type:'date', labelAr:'تاريخ إنتهاء العقد (إن وجد)' },
+      ]},
+    ],
+  },
+  loss_report: {
+    labelAr:'بلاغ فقدان', labelEn:'Loss Report', icon:'alerts', i1:'#FFC168', i2:'#B4790F',
+    steps: [
+      { titleAr:'ما الذي فُقد؟', fields:[
+        { key:'lostItemType', type:'select', labelAr:'نوع المفقود', options:['بطاقة','تصريح مركبة'] },
+        { key:'lostItemNumber', type:'text', labelAr:'رقم البطاقة / رقم تصريح المركبة' },
+      ]},
+      { titleAr:'بيانات إضافية', fields:[
+        { key:'contractNumber', type:'text', labelAr:'رقم العقد' },
+        { key:'unifiedNumber', type:'text', labelAr:'الرقم الموحد' },
+      ]},
+      { titleAr:'بيانات صاحب البطاقة / التصريح', fields:[
+        { key:'holderName', type:'text', labelAr:'الاسم' },
+        { key:'nationality', type:'text', labelAr:'الجنسية' },
+        { key:'idNumber', type:'text', labelAr:'رقم الهوية الوطنية / مقيم' },
+        { key:'entityDept', type:'text', labelAr:'الجهة / الإدارة' },
+        { key:'phone', type:'text', labelAr:'رقم الجوال' },
+      ]},
+      { titleAr:'تفاصيل الفقدان', fields:[
+        { key:'lossCount', type:'select', labelAr:'الفقدان للمرة', options:['الأولى','الثانية','الثالثة فأكثر'] },
+        { key:'lossDate', type:'date', labelAr:'تاريخ الفقدان' },
+        { key:'employerReportDate', type:'date', labelAr:'تاريخ إبلاغ جهة العمل' },
+        { key:'expiryDate', type:'date', labelAr:'تاريخ انتهاء صلاحية البطاقة / التصريح' },
+      ]},
+    ],
+  },
+  visit_request: {
+    labelAr:'طلب زيارة', labelEn:'Visit Request', icon:'visitors', i1:'#E0A86F', i2:'#A86F2E',
+    steps: [
+      { titleAr:'بيانات الجهة المستضيفة', fields:[
+        { key:'hostEntityName', type:'text', labelAr:'اسم الجهة' },
+        { key:'hostDepartment', type:'text', labelAr:'الإدارة المستضيفة' },
+        { key:'hostRepresentative', type:'text', labelAr:'ممثل الإدارة' },
+        { key:'hostPhone', type:'text', labelAr:'رقم الجوال' },
+        { key:'hostEmail', type:'text', labelAr:'البريد الإلكتروني' },
+      ]},
+      { titleAr:'موعد الزيارة', fields:[
+        { key:'visitStart', type:'date', labelAr:'تاريخ بداية الزيارة' },
+        { key:'visitEnd', type:'date', labelAr:'تاريخ نهاية الزيارة' },
+        { key:'visitPurpose', type:'textarea', labelAr:'الغرض من الزيارة' },
+      ]},
+      { titleAr:'قائمة الزوار', fields:[
+        { key:'visitors', type:'visitorsTable', labelAr:'الزوار' },
+      ]},
+    ],
+  },
+};
+
+// GRRK — Public request page for representatives/employees (no admin data).
+// Trimmed copy of modules/service-requests.js: only identify/register/
+// formtype/wizard/done. No landing choice, no inbox, no connection-config
+// screen — this page has exactly one job, and starts there immediately.
+// SR_ICONS and SR_FORM_DEFS are NOT duplicated here — build.sh extracts
+// them straight from modules/service-requests.js (the single source of
+// truth for form fields), so the two pages can never drift apart.
 
 // Same backend as the admin app (grrk-app), reached over plain fetch().
 const SR_CFG = {
@@ -441,66 +556,6 @@ async function srApiGet(url, params){
   const res = await fetch(url + (url.includes('?') ? '&' : '?') + qs);
   return res.json();
 }
-
-const SR_FORM_DEFS = {
-  vehicle_permit: {
-    labelAr:'طلب تصريح مركبة', icon:'servicerequests', i1:'#4FA0E0', i2:'#215E8C',
-    steps: [
-      { titleAr:'نوع الطلب', fields:[
-        { key:'requestType', type:'select', labelAr:'نوع الطلب', options:['إصدار','تجديد','بدل تالف / فاقد'] },
-      ]},
-      { titleAr:'نوع المركبة', fields:[
-        { key:'vehicleType', type:'select', labelAr:'نوع المركبة', options:['صالون','شاحنة','باص','بكب','معدة','مقطورة'] },
-      ]},
-      { titleAr:'بيانات المركبة', fields:[
-        { key:'plateNumber', type:'text', labelAr:'رقم اللوحة' },
-        { key:'ownerName', type:'text', labelAr:'اسم مالك المركبة' },
-      ]},
-    ],
-  },
-  badge: {
-    labelAr:'طلب إصدار بطاقة', icon:'employees', i1:'#7FD6A8', i2:'#2E9966',
-    steps: [
-      { titleAr:'نوع البطاقة', fields:[
-        { key:'cardType', type:'select', labelAr:'نوع البطاقة', options:['بطاقة موظف','بطاقة مقاول','بطاقة رجل أمن'] },
-      ]},
-      { titleAr:'نوع الطلب', fields:[
-        { key:'requestType', type:'select', labelAr:'نوع الطلب', options:['إصدار','تجديد','بدل تالف / فاقد','استبدال'] },
-      ]},
-      { titleAr:'بيانات إضافية', fields:[
-        { key:'jobTitle', type:'text', labelAr:'المسمى الوظيفي' },
-        { key:'idNumber', type:'text', labelAr:'رقم الهوية / الإقامة' },
-      ]},
-    ],
-  },
-  loss_report: {
-    labelAr:'بلاغ فقدان', icon:'alerts', i1:'#FFC168', i2:'#B4790F',
-    steps: [
-      { titleAr:'ما الذي فُقد؟', fields:[
-        { key:'lostItemType', type:'select', labelAr:'نوع المفقود', options:['بطاقة','تصريح مركبة'] },
-      ]},
-      { titleAr:'تفاصيل الفقدان', fields:[
-        { key:'lostItemNumber', type:'text', labelAr:'رقم البطاقة / التصريح (إن وجد)' },
-        { key:'lossDate', type:'date', labelAr:'تاريخ الفقدان' },
-      ]},
-    ],
-  },
-  visit_request: {
-    labelAr:'طلب زيارة', icon:'visitors', i1:'#E0A86F', i2:'#A86F2E',
-    steps: [
-      { titleAr:'موعد الزيارة', fields:[
-        { key:'visitStart', type:'date', labelAr:'تاريخ بداية الزيارة' },
-        { key:'visitEnd', type:'date', labelAr:'تاريخ نهاية الزيارة' },
-      ]},
-      { titleAr:'الغرض من الزيارة', fields:[
-        { key:'visitPurpose', type:'textarea', labelAr:'الغرض من الزيارة' },
-      ]},
-      { titleAr:'قائمة الزوار', fields:[
-        { key:'visitors', type:'visitorsTable', labelAr:'الزوار' },
-      ]},
-    ],
-  },
-};
 
 function showToast(msg){
   const el = document.createElement('div');

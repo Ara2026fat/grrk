@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<!--
+  GRRK — Service Requests (public, representative-facing)
+  Single-purpose page: no admin data, nothing but the submission flow.
+  (c) 2026 ARAFAT ALRAJHI. All Rights Reserved.
+-->
+<html lang="ar" dir="rtl" data-theme="day" data-accent="indigo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F3F2EC">
+<meta name="author" content="Arafat Alrajhi">
+<title>طلبات الخدمات — GRRK</title>
+<style>
+/* ============================================================
+   GRRK — نظام اللمعان البصري (Luster Design System)
+   Adapted from "سرّ اللمعان" (أُفق) — CSS-only glass, NO backdrop-filter.
+   Augmented with: 3D icon shading, shimmer sweep, elevation depth,
+   screen-transition choreography. Single-file app, ar(RTL)/en(LTR).
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root{
+  --display:'Space Grotesk','Tajawal',sans-serif;
+  --body:'Tajawal','Space Grotesk',sans-serif;
+  --radius-lg:26px; --radius-md:16px; --radius-sm:12px;
+  --dur-fast:.12s; --dur-base:.16s; --dur-slow:.26s; --dur-scene:.42s;
+  --ease:cubic-bezier(.22,.9,.26,1);
+}
+
+[data-theme="night"]{
+  color-scheme:dark;
+  --void:#0B0D14; --void2:#0E1017; --lift1:#1A1F33; --lift2:#151A28;
+  --ink:#E7E9F4; --ink-soft:#9195AB; --ink-faint:#5B6078;
+  --glass:linear-gradient(158deg, rgba(255,255,255,.065), rgba(255,255,255,.02));
+  --glass-line:rgba(255,255,255,.09);
+  --glass-shadow:0 20px 50px rgba(0,0,0,.48), 0 2px 0 rgba(255,255,255,.03) inset;
+  --edge:rgba(255,255,255,.22);
+  --flat:rgba(255,255,255,.035); --flat-line:rgba(255,255,255,.065);
+  --line:rgba(255,255,255,.08); --solid:#1B2030;
+  --glow:#4F72E0; --glow-tint:rgba(79,114,224,.18);
+  --gold:#F2C879; --gold2:#C9932E;
+  --ok:#52E3A6; --warn:#FFC168; --danger:#FF6B81;
+  --btn-bg:rgba(79,114,224,.2); --btn-line:rgba(79,114,224,.4); --btn-ink:#C3D1FA;
+  --shimmer:rgba(255,255,255,.5);
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(79,114,224,.34), transparent 72%), var(--void);
+  --icon-hl:rgba(255,255,255,.5); /* glossy highlight baked into every icon3d tile */
+}
+[data-theme="day"]{
+  color-scheme:light;
+  /* The page background sits a visible shade below pure white so the
+     glass cards (--lift1, pure white) and icon tiles actually read as
+     lifted/frosted surfaces instead of blending into the page. */
+  --void:#EAE7DD; --void2:#E2DDCF; --lift1:#FFFFFF; --lift2:#FBFAF5;
+  --ink:#1C1E2A; --ink-soft:#5B5F72; --ink-faint:#9497A6;
+  --glass:linear-gradient(158deg, rgba(255,255,255,.94), rgba(255,255,255,.6));
+  --glass-line:rgba(20,22,40,.1);
+  --glass-shadow:0 20px 42px rgba(40,40,70,.15), 0 2px 0 rgba(255,255,255,.75) inset;
+  --edge:rgba(255,255,255,.95);
+  --flat:rgba(0,0,0,.035); --flat-line:rgba(0,0,0,.08);
+  --line:rgba(0,0,0,.08); --solid:#FFFFFF;
+  --glow:#2541A8; --glow-tint:rgba(37,65,168,.16);
+  --gold:#B9872E; --gold2:#8A6416;
+  --ok:#188A5E; --warn:#A06A00; --danger:#C83C53;
+  --btn-bg:rgba(37,65,168,.16); --btn-line:rgba(37,65,168,.4); --btn-ink:#1C2E7A;
+  --shimmer:rgba(255,255,255,.85);
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(37,65,168,.34), transparent 68%), var(--void);
+  /* A brighter gloss highlight than the earlier near-zero value — enough
+     to give icon tiles a real glassy sheen without washing the accent
+     color out against the page. */
+  --icon-hl:rgba(255,255,255,.32);
+}
+
+/* ---------- Accent color variants (layered on top of night/day) ---------- */
+/* forest — deep, rich green */
+:root[data-theme="night"][data-accent="forest"]{
+  --glow:#1F9E63; --glow-tint:rgba(31,158,99,.18);
+  --btn-bg:rgba(31,158,99,.2); --btn-line:rgba(31,158,99,.4); --btn-ink:#B7F0D3;
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(31,158,99,.32), transparent 72%), var(--void);
+}
+:root[data-theme="day"][data-accent="forest"]{
+  --glow:#146B45; --glow-tint:rgba(20,107,69,.16);
+  --btn-bg:rgba(20,107,69,.17); --btn-line:rgba(20,107,69,.38); --btn-ink:#0E4A30;
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(20,107,69,.3), transparent 68%), var(--void);
+}
+/* graphite — steel gray, understated and technical */
+:root[data-theme="night"][data-accent="graphite"]{
+  --glow:#8792A6; --glow-tint:rgba(135,146,166,.18);
+  --btn-bg:rgba(135,146,166,.2); --btn-line:rgba(135,146,166,.4); --btn-ink:#D7DBE4;
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(135,146,166,.3), transparent 72%), var(--void);
+}
+:root[data-theme="day"][data-accent="graphite"]{
+  --glow:#444E5E; --glow-tint:rgba(68,78,94,.16);
+  --btn-bg:rgba(68,78,94,.16); --btn-line:rgba(68,78,94,.36); --btn-ink:#2B3240;
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(68,78,94,.3), transparent 68%), var(--void);
+}
+/* amber — warm, glossy honey-gold accent */
+:root[data-theme="night"][data-accent="amber"]{
+  --glow:#F0B93C; --glow-tint:rgba(240,185,60,.2);
+  --btn-bg:rgba(240,185,60,.22); --btn-line:rgba(240,185,60,.44); --btn-ink:#FBE4A3;
+  --app-bg:radial-gradient(1100px 560px at 50% -40px, rgba(240,185,60,.36), transparent 72%), var(--void);
+}
+:root[data-theme="day"][data-accent="amber"]{
+  --glow:#9C6B12; --glow-tint:rgba(156,107,18,.18);
+  --btn-bg:rgba(156,107,18,.18); --btn-line:rgba(156,107,18,.4); --btn-ink:#5C3E08;
+  --app-bg:radial-gradient(900px 520px at 50% -90px, rgba(156,107,18,.34), transparent 68%), var(--void);
+}
+
+*{box-sizing:border-box; margin:0}
+html,body{height:100%}
+/* Prevent the browser from silently shifting scroll position to "compensate"
+   for layout reflow above the fold — this happens when the web fonts finish
+   loading just after first paint (FOUT) and resize the text, which otherwise
+   made the page look like it opened scrolled past the hero straight to
+   whatever was next. */
+html{ overflow-anchor:none; }
+body{
+  background:var(--app-bg); background-attachment:fixed; color:var(--ink); font-family:var(--body);
+  line-height:1.6; -webkit-tap-highlight-color:transparent;
+  overscroll-behavior-y:none; min-height:100vh;
+  transition:background var(--dur-slow) var(--ease), color var(--dur-slow) var(--ease);
+}
+/* background-attachment:fixed pins the accent-colored glow to the viewport
+   (not the document), so it stays visible behind every screen regardless of
+   how tall the content is or how far the person has scrolled — otherwise
+   the gradient (anchored near the top of the document) scrolls out of view
+   on any screen taller than one viewport and the accent reads as "gone". */
+[dir="rtl"] body{font-family:'Tajawal','Space Grotesk',sans-serif}
+button, input, textarea, select{font-family:inherit}
+.font-variant-tabular, .num{font-variant-numeric:tabular-nums}
+
+/* ---------- Elevation system: exactly ONE .glass hero per screen ---------- */
+.glass{
+  background:var(--glass); border:1px solid var(--glass-line);
+  border-radius:var(--radius-lg); box-shadow:var(--glass-shadow);
+  padding:22px 20px; position:relative; overflow:hidden;
+}
+.glass::before{
+  /* accent-tinted hairline so the chosen accent color reads clearly on the
+     hero card itself, not only in the faint ambient page glow behind it */
+  content:''; position:absolute; inset:0 14% auto; height:1.5px; border-radius:1px;
+  background:linear-gradient(90deg,transparent,var(--glow),transparent);
+  opacity:.55;
+}
+/* The old full-card shimmer sweep (a slow light sweeping across the ENTIRE
+   hero card) read as a scanner/printhead pass over the whole screen rather
+   than a glossy accent — removed from .glass. The shine now lives only on
+   the small app/section icon tiles (.icon3d), see below, where a quick
+   glossy flash actually looks premium instead of a full-screen gimmick. */
+
+.card, .flat{
+  background:var(--flat); border:1px solid var(--flat-line);
+  border-radius:var(--radius-md); padding:16px 18px;
+  transition:border-color var(--dur-base) var(--ease), background var(--dur-base) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.card.pressable:active{ transform:scale(.985) }
+.divider{ height:1px; background:var(--line); border:0; margin:10px 0 }
+
+/* ---------- Typography ---------- */
+h1,.h1{font-family:var(--display); font-weight:700; font-size:clamp(22px,5vw,30px); letter-spacing:-.3px}
+h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
+.eyebrow{font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint)}
+.muted{color:var(--ink-soft)}
+.faint{color:var(--ink-faint); font-size:13px}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  background:var(--btn-bg); border:1px solid var(--btn-line); color:var(--btn-ink);
+  padding:13px 18px; border-radius:15px; font-family:var(--display); font-size:15px; font-weight:500;
+  transition:background var(--dur-base) ease, transform var(--dur-fast) ease, box-shadow var(--dur-base) ease;
+  cursor:pointer; width:100%;
+}
+.btn:hover{ filter:brightness(1.12) }
+.btn:active{ transform:scale(.988) }
+.btn.block{ width:100% } .btn.auto{ width:auto }
+.btn.primary{ background:linear-gradient(160deg, var(--glow), var(--gold2)); border-color:transparent; color:#fff; box-shadow:0 10px 24px -8px var(--glow-tint) }
+.btn.ghost{ background:transparent; border-color:transparent; color:var(--ink-soft); font-size:14px; padding:10px 14px; font-family:var(--body) }
+.btn.sm{ padding:9px 14px; font-size:13px; width:auto; border-radius:12px }
+.btn.danger{ background:rgba(255,107,129,.14); border-color:rgba(255,107,129,.34); color:var(--danger) }
+.fab{
+  /* A normal in-flow element (last child, right after the row list) —
+     NOT floating/fixed — so it can never overlap a row's text/badge.
+     margin-inline-start:auto pushes it to the trailing edge, same spot
+     it used to float over; margin-top gives it breathing room from the
+     last row. */
+  display:grid; place-items:center;
+  margin-block:22px 4px; margin-inline-start:auto; margin-inline-end:4px;
+  width:58px; height:58px; border-radius:50%;
+  background:linear-gradient(160deg, var(--glow), var(--gold2)); color:#fff; border:none;
+  box-shadow:0 14px 30px -8px var(--glow-tint), 0 0 0 1px rgba(255,255,255,.14) inset;
+  cursor:pointer; z-index:1; transition:transform var(--dur-fast) var(--ease);
+}
+.fab:active{ transform:scale(.92) }
+
+/* ---------- Choice / list rows ---------- */
+.row{ display:flex; align-items:center; gap:12px; padding:13px 2px; border-bottom:1px dashed var(--line) }
+.row:last-child{ border-bottom:0 }
+.choice{
+  display:block; width:100%; text-align:start; background:var(--flat); border:1px solid var(--flat-line);
+  border-radius:15px; padding:15px 16px; margin-bottom:9px; cursor:pointer;
+  transition:border-color var(--dur-base) ease, background var(--dur-base) ease;
+}
+.choice.active{ background:var(--glass); border-color:var(--glow) }
+
+/* ---------- Badges / status ---------- */
+.badge{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:4px 11px; border-radius:99px; }
+.badge.ok{ background:rgba(82,227,166,.14); color:var(--ok) }
+.badge.warn{ background:rgba(255,193,104,.16); color:var(--warn) }
+.badge.danger{ background:rgba(255,107,129,.14); color:var(--danger) }
+.badge.neutral{ background:var(--flat); color:var(--ink-soft) }
+
+/* ---------- 3D glow icon tiles ---------- */
+.icon3d{
+  width:52px; height:52px; border-radius:17px; display:grid; place-items:center; flex:none;
+  background:radial-gradient(120% 120% at 25% 20%, var(--icon-hl), transparent 55%), linear-gradient(155deg, var(--i1,var(--glow)), var(--i2,var(--gold2)));
+  box-shadow:0 14px 26px -8px var(--i1,var(--glow)), 0 2px 6px -2px var(--i1,var(--glow)), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -3px 6px rgba(0,0,0,.2);
+  color:#fff; position:relative; overflow:hidden;
+}
+.icon3d.sm{ width:36px; height:36px; border-radius:12px }
+.icon3d svg{ width:24px; height:24px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)) }
+.icon3d.sm svg{ width:19px; height:19px }
+/* Glossy shine confined to the icon tile itself (not the whole screen),
+   and — instead of every icon shimmering together — only ONE icon on the
+   page lights up at a time, in a slow relay from icon to icon. The relay
+   itself is driven by shell.js toggling .chase-on on one .icon3d at a
+   time; this is just the per-icon sweep that plays while that class is on. */
+.icon3d::after{
+  content:''; position:absolute; top:0; bottom:0; width:40%; left:-60%;
+  background:linear-gradient(100deg, transparent, var(--shimmer), transparent);
+  opacity:0; pointer-events:none;
+}
+.icon3d.chase-on::after{ opacity:.22; animation:icon-sweep 1.8s ease-in-out 1 both; }
+@keyframes icon-sweep{ 0%{left:-60%} 100%{left:120%} }
+
+/* ---------- KPI stat tile ---------- */
+.stat{ position:relative; padding:18px 16px; border-radius:18px; background:var(--flat); border:1px solid var(--flat-line); overflow:hidden; box-shadow:0 10px 22px -16px var(--glow-tint) }
+.stat .val{ font-family:var(--display); font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--glow) }
+.stat .lbl{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
+.stat .trend{ position:absolute; inset-inline-end:14px; top:16px; font-size:12px; font-weight:700 }
+.stat .trend.up{ color:var(--ok) } .stat .trend.down{ color:var(--danger) }
+
+/* ---------- Progress / expiry meter ---------- */
+.meter{ position:relative; height:9px; border-radius:99px; background:var(--flat); overflow:hidden }
+.meter i{ position:absolute; inset-inline-start:0; top:0; bottom:0; border-radius:99px; transition:width .9s var(--ease) }
+
+/* ---------- App shell: nav ---------- */
+.app-shell{ max-width:980px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column }
+.topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:16px 18px 14px; position:sticky; top:0; z-index:30; background:linear-gradient(var(--void) 72%, transparent); }
+.brand{ display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:700; font-size:17px }
+.brand-home{
+  display:flex; align-items:center; gap:10px; background:none; border:none; padding:2px; margin:0;
+  color:inherit; font:inherit; cursor:pointer; border-radius:12px;
+  transition:transform var(--dur-fast) var(--ease), opacity var(--dur-base) ease;
+}
+.brand-home:active{ transform:scale(.96) }
+.brand-home:disabled{ cursor:default }
+/* Back button: a solid, unmistakable chip (not a faint ghost icon) — the
+   whole point is that it must be impossible to miss on a deep screen. */
+.back-btn{
+  display:grid; place-items:center; width:34px; height:34px; border-radius:11px; flex:none;
+  background:var(--flat); border:1px solid var(--flat-line); color:var(--ink);
+  cursor:pointer; transition:background var(--dur-base) ease, transform var(--dur-fast) var(--ease);
+}
+.back-btn svg{ width:19px; height:19px }
+.back-btn:active{ transform:scale(.92); background:var(--glass) }
+[dir="rtl"] .back-btn svg{ transform:scaleX(-1) } /* chevron points toward reading-start in RTL */
+.main{ flex:1; padding:6px 16px 108px; }
+.navbar{
+  position:fixed; inset-inline:0; bottom:0; z-index:35;
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:2px 0;
+  padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  background:linear-gradient(158deg, var(--lift1), var(--lift2)); border-top:1px solid var(--glass-line);
+  box-shadow:0 -14px 40px rgba(0,0,0,.28);
+}
+.navbtn{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:none; border:none; color:var(--ink-faint); cursor:pointer; padding:5px 2px; border-radius:10px; transition:color var(--dur-base) ease; min-width:0 }
+.navbtn svg{ width:21px; height:21px }
+.navbtn.active{ color:var(--glow) }
+.navbtn.active .icon3d{ box-shadow:0 10px 20px -6px var(--glow-tint), inset 0 1px 0 rgba(255,255,255,.4) }
+.navbtn span{ font-size:9.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+
+/* ---------- Screen transitions ---------- */
+.screen{ animation:scene-in var(--dur-scene) var(--ease) both }
+@keyframes scene-in{ from{ opacity:0; transform:translateY(10px) scale(.985) } to{ opacity:1; transform:none } }
+.screen.leaving{ animation:scene-out var(--dur-base) ease both }
+@keyframes scene-out{ to{ opacity:0; transform:translateY(-6px) scale(.98) } }
+.stagger > *{ animation:rise .4s var(--ease) both }
+.stagger > *:nth-child(1){animation-delay:.02s} .stagger > *:nth-child(2){animation-delay:.06s}
+.stagger > *:nth-child(3){animation-delay:.1s} .stagger > *:nth-child(4){animation-delay:.14s}
+.stagger > *:nth-child(5){animation-delay:.18s} .stagger > *:nth-child(6){animation-delay:.22s}
+@keyframes rise{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+
+/* ---------- Modal / sheet ---------- */
+.overlay{ position:fixed; inset:0; background:rgba(5,6,12,.55); display:grid; place-items:center; padding:16px; z-index:200; animation:fade .2s ease }
+@keyframes fade{ from{opacity:0} to{opacity:1} }
+.sheet{
+  max-width:460px; width:100%; max-height:88vh; animation:sheet-in .3s var(--ease) both;
+  /* overflow-x:hidden (not just overflow:auto) so .glass::after's animated shimmer sweep
+     — which travels past 100% width — can never register as real scrollable content and
+     push the sheet into an unintended horizontal scroll range */
+  overflow-x:hidden; overflow-y:auto;
+  background:linear-gradient(158deg, var(--lift1), var(--lift2));
+}
+.sheet::before, .sheet::after{ opacity:.5 }
+@keyframes sheet-in{ from{ opacity:0; transform:translateY(24px) scale(.97) } to{ opacity:1; transform:none } }
+
+.field{ margin-bottom:14px }
+.field label{ display:block; font-size:13px; font-weight:600; color:var(--ink-soft); margin-bottom:6px }
+.field input, .field select, .field textarea{
+  width:100%; background:var(--flat); border:1px solid var(--flat-line); border-radius:12px;
+  padding:12px 14px; color:var(--ink); font-size:15px; outline:none;
+  transition:border-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--glow); box-shadow:0 0 0 3px var(--glow-tint) }
+
+.empty{ text-align:center; padding:50px 20px; color:var(--ink-faint) }
+.toast{ position:fixed; inset-inline:16px; bottom:calc(92px + env(safe-area-inset-bottom)); max-width:420px; margin:auto; background:var(--solid); color:var(--ink); border:1px solid var(--glass-line); padding:13px 18px; border-radius:14px; font-size:14px; z-index:300; animation:sheet-in .25s var(--ease) }
+
+/* ---------- PWA install banner ---------- */
+.install-banner{ position:fixed; inset-inline:14px; bottom:calc(92px + env(safe-area-inset-bottom)); max-width:460px; margin:auto; display:flex; align-items:center; gap:12px; background:var(--solid); color:var(--ink); border:1px solid var(--glass-line); padding:13px 14px; border-radius:16px; box-shadow:0 14px 30px -10px rgba(0,0,0,.28); z-index:260; animation:sheet-in .25s var(--ease) }
+.install-banner .ib-icon{ flex:0 0 auto; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:var(--btn-bg); color:var(--glow) }
+.install-banner .ib-icon svg{ width:20px; height:20px }
+.install-banner .ib-text{ flex:1; min-width:0 }
+.install-banner .ib-title{ font-size:13.5px; font-weight:700; color:var(--ink) }
+.install-banner .ib-sub{ font-size:12px; color:var(--ink-faint); margin-top:2px }
+.install-banner .ib-actions{ display:flex; align-items:center; gap:6px; flex:0 0 auto }
+.install-banner .ib-install{ background:var(--glow); color:#fff; border:none; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer }
+.install-banner .ib-close{ background:none; border:none; color:var(--ink-faint); cursor:pointer; padding:6px; display:flex }
+.install-banner .ib-close svg{ width:16px; height:16px }
+
+/* ---------- "More" hub sheet ---------- */
+.more-handle{ width:40px; height:4px; border-radius:99px; background:var(--flat-line); margin:0 auto 16px }
+.more-sheet{ max-height:82vh; overflow-y:auto; overscroll-behavior:contain }
+.more-group{ margin-bottom:20px }
+.more-group:last-child{ margin-bottom:4px }
+.more-group-label{ font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--ink-faint); text-transform:uppercase; margin-bottom:10px; padding-inline-start:2px }
+.more-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px }
+.more-tile{
+  display:flex; align-items:center; gap:12px; text-align:start; cursor:pointer;
+  background:var(--flat); border:1px solid var(--flat-line); border-radius:var(--radius-md);
+  padding:13px 14px; color:inherit; width:100%; min-width:0; /* let grid track shrink below content's
+  intrinsic min size instead of overflowing the sheet (the RTL cut-off-on-the-left bug) */
+  transition:border-color var(--dur-base) ease, background var(--dur-base) ease, transform var(--dur-fast) ease;
+  animation:rise .36s var(--ease) both;
+}
+.more-tile:active{ transform:scale(.97) }
+.more-tile:hover{ border-color:var(--glow); background:var(--glass) }
+.more-tile-text{ display:flex; flex-direction:column; gap:1px; min-width:0 }
+.more-tile-label{ font-size:13.5px; font-weight:700 }
+.more-tile-sub{ font-size:11px; color:var(--ink-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.more-group:nth-child(1) .more-tile:nth-child(1){animation-delay:.02s}
+.more-group:nth-child(1) .more-tile:nth-child(2){animation-delay:.05s}
+.more-group:nth-child(1) .more-tile:nth-child(3){animation-delay:.08s}
+.more-group:nth-child(1) .more-tile:nth-child(4){animation-delay:.11s}
+.more-group:nth-child(2) .more-tile:nth-child(1){animation-delay:.1s}
+.more-group:nth-child(2) .more-tile:nth-child(2){animation-delay:.13s}
+.more-group:nth-child(2) .more-tile:nth-child(3){animation-delay:.16s}
+.more-group:nth-child(3) .more-tile:nth-child(1){animation-delay:.18s}
+.more-group:nth-child(3) .more-tile:nth-child(2){animation-delay:.21s}
+
+::-webkit-scrollbar{ width:0; height:0 }
+.sr-landing-grid{ display:flex; flex-direction:column; gap:12px; margin-top:4px }
+.sr-big-btn{ display:flex; align-items:center; gap:14px; width:100%; text-align:start; cursor:pointer }
+.sr-big-btn .sr-big-text{ flex:1; min-width:0 }
+.sr-big-btn .sr-big-title{ font-weight:700; font-size:15px }
+.sr-big-btn .sr-big-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
+.sr-config-link{ text-align:center; margin-top:16px; font-size:12.5px; color:var(--ink-faint); cursor:pointer; text-decoration:underline; text-underline-offset:3px }
+.sr-notconfigured{ text-align:center; padding:28px 16px }
+.sr-rep-chip{ display:flex; align-items:center; gap:12px; margin-bottom:16px }
+.sr-rep-chip .sr-rep-text{ flex:1; min-width:0 }
+.sr-rep-name{ font-weight:700; font-size:15px }
+.sr-rep-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
+.sr-formtype-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px }
+.sr-formtype-card{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:20px 10px; cursor:pointer }
+.sr-formtype-card .sr-ft-label{ font-weight:700; font-size:13.5px; line-height:1.4 }
+.sr-progress{ display:flex; gap:6px; justify-content:center; margin-bottom:18px }
+.sr-progress .dot{ width:8px; height:8px; border-radius:50%; background:var(--flat-line); transition:background .2s ease, transform .2s ease }
+.sr-progress .dot.done{ background:var(--glow) }
+.sr-progress .dot.active{ background:var(--glow); transform:scale(1.3) }
+.sr-step-title{ font-family:var(--display); font-weight:700; font-size:19px; margin-bottom:18px; text-align:center }
+.sr-wizard-actions{ display:flex; gap:10px; margin-top:22px }
+.sr-wizard-actions .btn{ flex:1 }
+.sr-big-id{ font-family:var(--display); font-weight:700; font-size:36px; letter-spacing:1px; text-align:center; color:var(--glow); margin:14px 0; font-variant-numeric:tabular-nums }
+.sr-done-icon{ width:68px; height:68px; margin:0 auto 16px; border-radius:22px; display:grid; place-items:center;
+  background:rgba(31,158,99,.15); color:var(--ok) }
+.sr-done-icon svg{ width:34px; height:34px }
+.sr-visitor-row{ display:grid; grid-template-columns:1fr; gap:8px; padding:12px; border-radius:14px; background:var(--flat); border:1px solid var(--flat-line); margin-bottom:10px; position:relative }
+.sr-visitor-row .sr-visitor-remove{ position:absolute; top:8px; inset-inline-end:8px; background:none; border:none; color:var(--danger); cursor:pointer; padding:4px }
+.sr-add-visitor{ width:100%; margin-top:4px }
+.sr-inbox-row{ display:flex; align-items:center; gap:12px; width:100%; text-align:start; cursor:pointer }
+.sr-inbox-row .sr-inbox-text{ flex:1; min-width:0 }
+.sr-inbox-row .sr-inbox-title{ font-weight:700; font-size:14.5px }
+.sr-inbox-row .sr-inbox-sub{ font-size:12px; color:var(--ink-soft); margin-top:2px }
+.sr-status-badge-pending{ background:rgba(255,193,104,.16); color:var(--warn) }
+.sr-status-badge-approved{ background:rgba(31,158,99,.15); color:var(--ok) }
+.sr-status-badge-rejected{ background:rgba(255,107,129,.14); color:var(--danger) }
+.sr-detail-row{ display:flex; justify-content:space-between; gap:10px; padding:10px 2px; border-bottom:1px dashed var(--line); font-size:13.5px }
+.sr-detail-row:last-child{ border-bottom:0 }
+.sr-detail-row .k{ color:var(--ink-soft) }
+.sr-detail-row .v{ font-weight:600; text-align:end }
+.sr-loading{ text-align:center; padding:30px; color:var(--ink-faint); font-size:13.5px }
+</style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">GRRK</div>
+    </div>
+    <div class="main" id="main"></div>
+  </div>
+  <script>
+// GRRK — Public request page for representatives/employees (no admin data).
+// Trimmed copy of modules/service-requests.js: only identify/register/
+// formtype/wizard/done. No landing choice, no inbox, no connection-config
+// screen — this page has exactly one job, and starts there immediately.
+
+const SR_ICONS = {
+  servicerequests:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z"/><path d="m9 13 2 2 4-4.3"/></svg>',
+  employees:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg>',
+  alerts:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>',
+  visitors:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 3v3M16 3v3M3.5 10h17"/><path d="m9 15 2 2 4-4"/></svg>',
+};
+
+// Same backend as the admin app (grrk-app), reached over plain fetch().
+const SR_CFG = {
+  url: 'https://script.google.com/macros/s/AKfycbyHSZZ3ZaNP9PuLayeQinDHhtS9PxfhnHD-6_XKka-rNqT0nVw8OSFnxFnEIJRYMQCsaQ/exec',
+  token: 'grrk-vw0m8nmgaj'
+};
+const SR_SESSION_KEY = 'grrk_rep_session_v1';
+function srLoadSession(){ try{ return JSON.parse(localStorage.getItem(SR_SESSION_KEY)) || null; }catch(e){ return null; } }
+function srSaveSession(s){ try{ localStorage.setItem(SR_SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+function srClearSession(){ try{ localStorage.removeItem(SR_SESSION_KEY); }catch(e){} }
+
+async function srApiPost(url, body){
+  const res = await fetch(url, { method:'POST', body: JSON.stringify(body) });
+  return res.json();
+}
+async function srApiGet(url, params){
+  const qs = Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k]==null?'':params[k])).join('&');
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + qs);
+  return res.json();
+}
+
+const SR_FORM_DEFS = {
+  vehicle_permit: {
+    labelAr:'طلب تصريح مركبة', icon:'servicerequests', i1:'#4FA0E0', i2:'#215E8C',
+    steps: [
+      { titleAr:'نوع الطلب', fields:[
+        { key:'requestType', type:'select', labelAr:'نوع الطلب', options:['إصدار','تجديد','بدل تالف / فاقد'] },
+      ]},
+      { titleAr:'نوع المركبة', fields:[
+        { key:'vehicleType', type:'select', labelAr:'نوع المركبة', options:['صالون','شاحنة','باص','بكب','معدة','مقطورة'] },
+      ]},
+      { titleAr:'بيانات المركبة', fields:[
+        { key:'plateNumber', type:'text', labelAr:'رقم اللوحة' },
+        { key:'ownerName', type:'text', labelAr:'اسم مالك المركبة' },
+      ]},
+    ],
+  },
+  badge: {
+    labelAr:'طلب إصدار بطاقة', icon:'employees', i1:'#7FD6A8', i2:'#2E9966',
+    steps: [
+      { titleAr:'نوع البطاقة', fields:[
+        { key:'cardType', type:'select', labelAr:'نوع البطاقة', options:['بطاقة موظف','بطاقة مقاول','بطاقة رجل أمن'] },
+      ]},
+      { titleAr:'نوع الطلب', fields:[
+        { key:'requestType', type:'select', labelAr:'نوع الطلب', options:['إصدار','تجديد','بدل تالف / فاقد','استبدال'] },
+      ]},
+      { titleAr:'بيانات إضافية', fields:[
+        { key:'jobTitle', type:'text', labelAr:'المسمى الوظيفي' },
+        { key:'idNumber', type:'text', labelAr:'رقم الهوية / الإقامة' },
+      ]},
+    ],
+  },
+  loss_report: {
+    labelAr:'بلاغ فقدان', icon:'alerts', i1:'#FFC168', i2:'#B4790F',
+    steps: [
+      { titleAr:'ما الذي فُقد؟', fields:[
+        { key:'lostItemType', type:'select', labelAr:'نوع المفقود', options:['بطاقة','تصريح مركبة'] },
+      ]},
+      { titleAr:'تفاصيل الفقدان', fields:[
+        { key:'lostItemNumber', type:'text', labelAr:'رقم البطاقة / التصريح (إن وجد)' },
+        { key:'lossDate', type:'date', labelAr:'تاريخ الفقدان' },
+      ]},
+    ],
+  },
+  visit_request: {
+    labelAr:'طلب زيارة', icon:'visitors', i1:'#E0A86F', i2:'#A86F2E',
+    steps: [
+      { titleAr:'موعد الزيارة', fields:[
+        { key:'visitStart', type:'date', labelAr:'تاريخ بداية الزيارة' },
+        { key:'visitEnd', type:'date', labelAr:'تاريخ نهاية الزيارة' },
+      ]},
+      { titleAr:'الغرض من الزيارة', fields:[
+        { key:'visitPurpose', type:'textarea', labelAr:'الغرض من الزيارة' },
+      ]},
+      { titleAr:'قائمة الزوار', fields:[
+        { key:'visitors', type:'visitorsTable', labelAr:'الزوار' },
+      ]},
+    ],
+  },
+};
+
+function showToast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 2600);
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function iconCheck(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`; }
+function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>`; }
+
+function startApp(){
+  const root = document.getElementById('main');
+  const cfg = SR_CFG;
+
+  let session = srLoadSession();
+  let view = session ? 'formtype' : 'identify';   // identify | register | formtype | wizard | done
+  let wizardForm = null;
+  let wizardStep = 0;
+  let wizardData = {};
+  let lastRequestId = '';
+
+  function paint(){
+    if(view === 'identify') return paintIdentify();
+    if(view === 'register') return paintRegister();
+    if(view === 'formtype') return paintFormType();
+    if(view === 'wizard') return paintWizard();
+    if(view === 'done') return paintDone();
+  }
+
+  function paintIdentify(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:16px">
+        <div class="eyebrow">تقديم طلب</div>
+        <p class="muted" style="margin-top:8px">عندك رقم تسجيل سابق؟</p>
+      </div>
+      <div class="card">
+        <div class="field"><label>رقم التسجيل (مثال: MND-0001)</label>
+          <input type="text" id="sr-id-input" dir="ltr" placeholder="MND-0001">
+        </div>
+        <button class="btn primary block" id="sr-id-check">متابعة</button>
+      </div>
+      <button class="btn ghost block" id="sr-id-new" style="margin-top:12px">ليس عندي رقم — تسجيل جديد</button>
+    `;
+    root.querySelector('#sr-id-check').addEventListener('click', async ()=>{
+      const repId = root.querySelector('#sr-id-input').value.trim();
+      if(!repId){ showToast('اكتب رقم التسجيل'); return; }
+      const btn = root.querySelector('#sr-id-check');
+      btn.disabled = true; btn.textContent = 'جار التحقق...';
+      try{
+        const res = await srApiGet(cfg.url, { token:cfg.token, action:'get_rep', rep_id:repId });
+        if(res.ok){
+          session = { rep_id:res.rep.rep_id, name:res.rep.name, company:res.rep.company };
+          srSaveSession(session);
+          view = 'formtype'; paint();
+        }else{
+          showToast('رقم التسجيل غير موجود');
+          btn.disabled = false; btn.textContent = 'متابعة';
+        }
+      }catch(e){
+        showToast('تعذر الاتصال، حاول مرة أخرى');
+        btn.disabled = false; btn.textContent = 'متابعة';
+      }
+    });
+    root.querySelector('#sr-id-new').addEventListener('click', ()=>{ view='register'; paint(); });
+  }
+
+  function paintRegister(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:16px">
+        <div class="eyebrow">تسجيل جديد</div>
+        <p class="muted" style="margin-top:8px">بيانات بسيطة، مرة وحدة فقط</p>
+      </div>
+      <div class="card">
+        <div class="field"><label>الاسم</label><input type="text" id="sr-r-name"></div>
+        <div class="field"><label>الشركة / الجهة</label><input type="text" id="sr-r-company"></div>
+        <div class="field"><label>رقم الجوال</label><input type="tel" id="sr-r-phone" dir="ltr"></div>
+        <div class="field"><label>البريد الإلكتروني</label><input type="email" id="sr-r-email" dir="ltr"></div>
+        <button class="btn primary block" id="sr-r-submit">تسجيل</button>
+      </div>
+    `;
+    root.querySelector('#sr-r-submit').addEventListener('click', async ()=>{
+      const name = root.querySelector('#sr-r-name').value.trim();
+      const company = root.querySelector('#sr-r-company').value.trim();
+      const phone = root.querySelector('#sr-r-phone').value.trim();
+      const email = root.querySelector('#sr-r-email').value.trim();
+      if(!name || !phone){ showToast('الاسم والجوال مطلوبان'); return; }
+      const btn = root.querySelector('#sr-r-submit');
+      btn.disabled = true; btn.textContent = 'جار التسجيل...';
+      try{
+        const res = await srApiPost(cfg.url, { token:cfg.token, action:'register_rep', name, company, phone, email });
+        if(res.ok){
+          session = { rep_id:res.rep_id, name, company };
+          srSaveSession(session);
+          root.innerHTML = `
+            <div class="glass" style="text-align:center">
+              <div class="sr-done-icon">${iconCheck()}</div>
+              <div class="h2">تم التسجيل بنجاح</div>
+              <div class="muted" style="margin-top:6px">رقمك الخاص</div>
+              <div class="sr-big-id">${esc(res.rep_id)}</div>
+              <button class="btn primary block" id="sr-r-continue">متابعة لتقديم الطلب</button>
+            </div>
+          `;
+          root.querySelector('#sr-r-continue').addEventListener('click', ()=>{ view='formtype'; paint(); });
+        }else{
+          showToast('تعذر التسجيل');
+          btn.disabled = false; btn.textContent = 'تسجيل';
+        }
+      }catch(e){
+        showToast('تعذر الاتصال');
+        btn.disabled = false; btn.textContent = 'تسجيل';
+      }
+    });
+  }
+
+  function paintFormType(){
+    root.innerHTML = `
+      <div class="glass sr-rep-chip">
+        <span class="icon3d sm" style="--i1:var(--glow);--i2:var(--gold2)">${SR_ICONS.employees}</span>
+        <span class="sr-rep-text">
+          <span class="sr-rep-name">${esc(session.name||'')}</span>
+          <span class="sr-rep-sub">${esc(session.rep_id)} ${session.company?('· '+esc(session.company)):''}</span>
+        </span>
+      </div>
+      <div class="sr-formtype-grid">
+        ${Object.keys(SR_FORM_DEFS).map(key=>{
+          const f = SR_FORM_DEFS[key];
+          return `
+            <button type="button" class="card pressable sr-formtype-card" data-form="${key}">
+              <span class="icon3d" style="--i1:${f.i1};--i2:${f.i2}">${SR_ICONS[f.icon]}</span>
+              <span class="sr-ft-label">${esc(f.labelAr)}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <button class="btn ghost block" id="sr-ft-switch" style="margin-top:16px">لست أنا — تبديل الحساب</button>
+    `;
+    root.querySelectorAll('[data-form]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        wizardForm = btn.getAttribute('data-form');
+        wizardStep = 0;
+        wizardData = {};
+        view = 'wizard';
+        paint();
+      });
+    });
+    root.querySelector('#sr-ft-switch').addEventListener('click', ()=>{
+      srClearSession(); session = null; view = 'identify'; paint();
+    });
+  }
+
+  function renderFieldInput(f){
+    const val = wizardData[f.key];
+    if(f.type === 'select'){
+      return `
+        <div class="field">
+          <label>${esc(f.labelAr)}</label>
+          <select id="sr-f-${f.key}">
+            <option value="" disabled ${!val?'selected':''}>اختر...</option>
+            ${f.options.map(o=>`<option value="${esc(o)}" ${val===o?'selected':''}>${esc(o)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+    if(f.type === 'textarea'){
+      return `<div class="field"><label>${esc(f.labelAr)}</label><textarea id="sr-f-${f.key}" rows="4">${esc(val||'')}</textarea></div>`;
+    }
+    if(f.type === 'date'){
+      return `<div class="field"><label>${esc(f.labelAr)}</label><input type="date" id="sr-f-${f.key}" value="${esc(val||'')}"></div>`;
+    }
+    return `<div class="field"><label>${esc(f.labelAr)}</label><input type="text" id="sr-f-${f.key}" value="${esc(val||'')}"></div>`;
+  }
+
+  function renderVisitorsTable(){
+    if(!Array.isArray(wizardData.visitors) || wizardData.visitors.length === 0){
+      wizardData.visitors = [{ name:'', nationality:'', idNumber:'' }];
+    }
+    return `
+      <div id="sr-visitors-wrap">
+        ${wizardData.visitors.map((v,i)=>`
+          <div class="sr-visitor-row">
+            ${wizardData.visitors.length > 1 ? `<button type="button" class="sr-visitor-remove" data-rm="${i}">${iconTrash()}</button>` : ''}
+            <div class="field" style="margin-bottom:6px"><label>اسم الزائر ${i+1}</label><input type="text" class="sr-v-name" data-idx="${i}" value="${esc(v.name)}"></div>
+            <div class="field" style="margin-bottom:6px"><label>الجنسية</label><input type="text" class="sr-v-nat" data-idx="${i}" value="${esc(v.nationality)}"></div>
+            <div class="field" style="margin-bottom:0"><label>رقم الهوية / الإقامة / الجواز</label><input type="text" class="sr-v-id" data-idx="${i}" dir="ltr" value="${esc(v.idNumber)}"></div>
+          </div>
+        `).join('')}
+      </div>
+      <button type="button" class="btn ghost sr-add-visitor" id="sr-add-visitor">+ إضافة زائر</button>
+    `;
+  }
+
+  function wireVisitorsTable(){
+    const wrap = root.querySelector('#sr-visitors-wrap');
+    if(!wrap) return;
+    root.querySelectorAll('.sr-v-name').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].name = e.target.value; }));
+    root.querySelectorAll('.sr-v-nat').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].nationality = e.target.value; }));
+    root.querySelectorAll('.sr-v-id').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].idNumber = e.target.value; }));
+    root.querySelectorAll('[data-rm]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        wizardData.visitors.splice(+btn.getAttribute('data-rm'), 1);
+        paintWizard();
+      });
+    });
+    const addBtn = root.querySelector('#sr-add-visitor');
+    if(addBtn){
+      addBtn.addEventListener('click', ()=>{
+        if(wizardData.visitors.length >= 10){ showToast('الحد الأقصى 10 زوار'); return; }
+        wizardData.visitors.push({ name:'', nationality:'', idNumber:'' });
+        paintWizard();
+      });
+    }
+  }
+
+  function collectStepValues(step){
+    step.fields.forEach(f=>{
+      if(f.type === 'visitorsTable') return;
+      const el = root.querySelector('#sr-f-'+f.key);
+      if(el) wizardData[f.key] = el.value;
+    });
+  }
+
+  function paintWizard(){
+    const def = SR_FORM_DEFS[wizardForm];
+    const steps = def.steps;
+    const step = steps[wizardStep];
+    const isLast = wizardStep === steps.length - 1;
+
+    root.innerHTML = `
+      <div class="glass">
+        <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>
+        <div class="sr-progress" style="margin-top:14px">
+          ${steps.map((s,i)=>`<span class="dot ${i<wizardStep?'done':(i===wizardStep?'active':'')}"></span>`).join('')}
+        </div>
+        <div class="sr-step-title">${esc(step.titleAr||'')}</div>
+        ${step.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
+        <div class="sr-wizard-actions">
+          ${wizardStep>0 ? `<button class="btn ghost" id="sr-w-back">السابق</button>` : `<button class="btn ghost" id="sr-w-cancel">إلغاء</button>`}
+          <button class="btn primary" id="sr-w-next">${isLast?'إرسال الطلب':'التالي'}</button>
+        </div>
+      </div>
+    `;
+    wireVisitorsTable();
+
+    const backBtn = root.querySelector('#sr-w-back');
+    if(backBtn) backBtn.addEventListener('click', ()=>{ collectStepValues(step); wizardStep--; paint(); });
+    const cancelBtn = root.querySelector('#sr-w-cancel');
+    if(cancelBtn) cancelBtn.addEventListener('click', ()=>{ view='formtype'; paint(); });
+
+    root.querySelector('#sr-w-next').addEventListener('click', async ()=>{
+      collectStepValues(step);
+      if(!isLast){ wizardStep++; paint(); return; }
+      const btn = root.querySelector('#sr-w-next');
+      btn.disabled = true; btn.textContent = 'جار الإرسال...';
+      try{
+        const res = await srApiPost(cfg.url, {
+          token: cfg.token,
+          form_type: wizardForm,
+          rep_id: session.rep_id,
+          submitter_type: 'rep',
+          payload: wizardData,
+        });
+        if(res.ok){
+          lastRequestId = res.id;
+          view = 'done';
+          paint();
+        }else{
+          showToast('تعذر إرسال الطلب');
+          btn.disabled = false; btn.textContent = 'إرسال الطلب';
+        }
+      }catch(e){
+        showToast('تعذر الاتصال');
+        btn.disabled = false; btn.textContent = 'إرسال الطلب';
+      }
+    });
+  }
+
+  function paintDone(){
+    root.innerHTML = `
+      <div class="glass" style="text-align:center">
+        <div class="sr-done-icon">${iconCheck()}</div>
+        <div class="h2">تم استلام طلبك</div>
+        <div class="muted" style="margin-top:6px">رقم الطلب</div>
+        <div class="sr-big-id">${esc(lastRequestId)}</div>
+        <p class="muted" style="margin-top:6px">راح يوصلك إيميل فور مراجعته</p>
+        <button class="btn primary block" id="sr-done-another" style="margin-top:16px">تقديم طلب آخر</button>
+      </div>
+    `;
+    root.querySelector('#sr-done-another').addEventListener('click', ()=>{ view='formtype'; paint(); });
+  }
+
+  paint();
+}
+
+document.addEventListener('DOMContentLoaded', startApp);
+</script>
+</body>
+</html>

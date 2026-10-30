@@ -8,9 +8,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F3F2EC">
+<meta name="theme-color" content="#0B2A6B">
 <meta name="author" content="Arafat Alrajhi">
 <title>طلبات الخدمات — GRRK</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <style>
 /* ============================================================
    GRRK — نظام اللمعان البصري (Luster Design System)
@@ -396,6 +399,12 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .sr-status-badge-approved{ background:rgba(31,158,99,.15); color:var(--ok) }
 .sr-status-badge-rejected{ background:rgba(255,107,129,.14); color:var(--danger) }
 #sr-print{ display:none }
+.sr-paper{ background:#fff; color:#111; border:1px solid #d8d8d8; border-radius:14px; padding:12px; box-shadow:0 6px 18px -10px rgba(0,0,0,.25) }
+.sr-paper .lh img{ width:78%; max-width:360px; display:block; margin-bottom:6px }
+.sr-paper h1{ font-size:17px; text-align:center; margin:6px 0 10px }
+.sr-paper table{ width:100%; border-collapse:collapse; font-size:12.5px }
+.sr-paper td{ border:1px solid #555; padding:6px 8px; vertical-align:top; min-height:26px; word-break:break-word }
+.sr-paper td.k{ width:40%; background:#eee; font-weight:700 }
 .sr-viewer-img{ width:100%; display:block; border-radius:var(--radius-md); border:1px solid var(--flat-line); margin-bottom:12px; background:#fff }
 @media print{ #sr-print img{ width:100%; display:block; page-break-after:always } }
 @media print{
@@ -415,12 +424,26 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
 .sr-detail-row .v{ font-weight:600; text-align:end }
 .sr-loading{ text-align:center; padding:30px; color:var(--ink-faint); font-size:13.5px }
 </style>
-<style>#backBtn[hidden]{display:none}</style>
+<style>
+#backBtn[hidden]{display:none}
+.brand-ico{ position:relative; display:inline-block; width:38px; height:38px; border-radius:11px; overflow:hidden; box-shadow:0 8px 16px -6px rgba(11,42,107,.55), 0 0 0 1px rgba(255,255,255,.25) inset; animation:brandFloat 5s ease-in-out infinite }
+.brand-ico img{ width:100%; height:100%; display:block }
+.brand-ico::after{ content:""; position:absolute; inset:-30% -60%; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,.75) 50%, transparent 60%); transform:translateX(-120%); animation:brandShine 4.5s ease-in-out infinite }
+@keyframes brandShine{ 0%,55%{ transform:translateX(-120%) } 90%,100%{ transform:translateX(120%) } }
+@keyframes brandFloat{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-2px) } }
+@media (prefers-reduced-motion:reduce){ .brand-ico,.brand-ico::after{ animation:none } }
+.inst-bar{ position:fixed; inset-inline:12px; bottom:14px; z-index:60; display:flex; align-items:center; gap:10px; background:#0B2A6B; color:#fff; border-radius:16px; padding:10px 12px; box-shadow:0 14px 30px -10px rgba(0,0,0,.5) }
+.inst-bar img{ width:40px; height:40px; border-radius:10px }
+.inst-bar .t{ flex:1; font-size:13px; line-height:1.4 }
+.inst-bar button{ font:inherit; border:0; border-radius:10px; padding:8px 14px; cursor:pointer }
+.inst-bar .go{ background:#fff; color:#0B2A6B; font-weight:700 }
+.inst-bar .x{ background:transparent; color:#cfd8f5; padding:8px }
+</style>
 </head>
 <body>
   <div class="app-shell">
     <div class="topbar">
-      <div class="brand">GRRK</div>
+      <div class="brand" style="display:flex;align-items:center;gap:10px"><span class="brand-ico"><img src="icon-192.png" alt=""></span><span>طلبات الخدمات</span></div>
       <button id="backBtn" class="back-btn" type="button" hidden aria-label="رجوع"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
     </div>
     <div class="main" id="main"></div>
@@ -574,6 +597,40 @@ async function srApiGet(url, params){
   return res.json();
 }
 
+const SR_PRINT_CSS = `
+*{ box-sizing:border-box }
+body{ margin:0; font-family:Tahoma,Arial,sans-serif; color:#111; background:#fff; direction:rtl }
+.bar{ position:sticky; top:0; background:#0b2a6b; padding:10px; text-align:center; z-index:5 }
+.bar button{ font:inherit; font-size:16px; padding:10px 26px; border:0; border-radius:10px; background:#fff; color:#0b2a6b; font-weight:700 }
+.doc{ max-width:820px; margin:0 auto; padding:18px 18px 40px }
+.lh{ text-align:right; margin-bottom:8px }
+.lh img{ width:62%; max-width:420px; height:auto }
+h1{ font-size:20px; text-align:center; margin:10px 0 4px }
+.sub{ text-align:center; font-size:12px; color:#333; margin-bottom:14px }
+table{ width:100%; border-collapse:collapse; font-size:13px }
+td{ border:1px solid #444; padding:7px 9px; vertical-align:top }
+td.k{ width:38%; background:#eee; font-weight:700 }
+.appr{ margin-top:22px; border:1px solid #444; padding:12px; display:flex; justify-content:space-between; align-items:center; min-height:110px; gap:12px }
+.appr img{ max-width:130px; max-height:110px }
+.pg{ width:100%; display:block; margin:0 0 10px; border:1px solid #ccc }
+.note{ font-size:12px; margin-top:10px; color:#333 }
+@media print{ .bar{ display:none } .doc{ padding:0 } .pg{ border:0; margin:0; page-break-after:always } @page{ size:A4; margin:12mm } }
+`;
+function srAbs(rel){ try{ return new URL(rel, location.href).href; }catch(e){ return rel; } }
+function srLetterhead(){ return '<div class="lh"><img src="' + srAbs('../brand/letterhead.png') + '" alt=""></div>'; }
+// Opens a standalone printable page in a new tab (works on iPhone: Share > Print / Save PDF).
+// If pop-ups are blocked it prints in place instead.
+function srOpenPrintDoc(title, bodyHtml){
+  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + '</title><style>' + SR_PRINT_CSS + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button></div><div class="doc">' + bodyHtml + '</div></body></html>';
+  const w = window.open('', '_blank');
+  if(w){ w.document.open(); w.document.write(html); w.document.close(); return true; }
+  const old = document.getElementById('sr-print'); if(old) old.remove();
+  const el = document.createElement('div'); el.id = 'sr-print'; el.innerHTML = bodyHtml; document.body.appendChild(el);
+  window.addEventListener('afterprint', ()=>{ const e = document.getElementById('sr-print'); if(e) e.remove(); }, { once:true });
+  window.print();
+  return true;
+}
+
 function showToast(msg){
   const el = document.createElement('div');
   el.className = 'toast';
@@ -586,6 +643,32 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;
 function iconCheck(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`; }
 function iconTrash(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>`; }
 
+// ---- Install prompt (Android: native prompt; iPhone: Share > Add to Home Screen) ----
+(function initInstall(){
+  if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }catch(e){} }
+  const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+  if(standalone) return;
+  let dismissed = false; try{ dismissed = localStorage.getItem('grrk_req_inst_dismissed') === '1'; }catch(e){}
+  if(dismissed) return;
+  function bar(html, onGo){
+    if(document.getElementById('inst-bar')) return;
+    const el = document.createElement('div'); el.id = 'inst-bar'; el.className = 'inst-bar';
+    el.innerHTML = '<img src="icon-192.png" alt=""><div class="t">' + html + '</div>' + (onGo ? '<button class="go" type="button">تثبيت</button>' : '') + '<button class="x" type="button" aria-label="إغلاق">✕</button>';
+    document.body.appendChild(el);
+    el.querySelector('.x').addEventListener('click', ()=>{ el.remove(); try{ localStorage.setItem('grrk_req_inst_dismissed','1'); }catch(e){} });
+    if(onGo) el.querySelector('.go').addEventListener('click', ()=>{ onGo(); el.remove(); });
+  }
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault(); deferred = e;
+    bar('ثبّت تطبيق <b>طلبات الخدمات</b> على جوالك للوصول السريع', ()=>{ deferred.prompt(); });
+  });
+  const ua = navigator.userAgent || '';
+  if(/iPhone|iPad|iPod/.test(ua) && !/CriOS|FxiOS/.test(ua)){
+    setTimeout(()=> bar('لتثبيت التطبيق: اضغط زر <b>المشاركة</b> ثم <b>إضافة إلى الشاشة الرئيسية</b>'), 1500);
+  }
+})();
+
 function startApp(){
   const root = document.getElementById('main');
   const cfg = SR_CFG;
@@ -597,6 +680,7 @@ function startApp(){
   let wizardStep = 0;
   let wizardData = {};
   let lastRequestId = '';
+  let lastSubmitted = null;
 
   const CITY = 'مدينة رأس الخير للصناعات التعدينية';
   const backBtn = document.getElementById('backBtn');
@@ -613,12 +697,7 @@ function startApp(){
       ${def.viewFiles.map(f=>`<img class="sr-viewer-img" src="${SR_FORMS_BASE}${f}" alt="">`).join('')}
     `;
     root.querySelector('#sr-v-print').addEventListener('click', ()=>{
-      const old = document.getElementById('sr-print'); if(old) old.remove();
-      const el = document.createElement('div'); el.id = 'sr-print';
-      el.innerHTML = def.viewFiles.map(f=>`<img src="${SR_FORMS_BASE}${f}" alt="">`).join('');
-      document.body.appendChild(el);
-      window.addEventListener('afterprint', ()=>{ const e=document.getElementById('sr-print'); if(e) e.remove(); }, { once:true });
-      setTimeout(()=> window.print(), 200);
+      srOpenPrintDoc(def.labelAr, def.viewFiles.map(f=>`<img class="pg" src="${srAbs(SR_FORMS_BASE+f)}" alt="">`).join(''));
     });
   }
 
@@ -637,11 +716,7 @@ function startApp(){
   function goBack(){
     if(view === 'identify'){ pendingForm=null; view='formtype'; }
     else if(view === 'register' || view === 'employee'){ view='identify'; }
-    else if(view === 'wizard'){
-      const st = SR_FORM_DEFS[wizardForm].steps[wizardStep];
-      st.fields.forEach(f=>{ if(f.type==='visitorsTable') return; const el = root.querySelector('#sr-f-'+f.key); if(el) wizardData[f.key] = el.value; });
-      if(wizardStep > 0) wizardStep--; else view='formtype';
-    }
+    else if(view === 'wizard'){ view='formtype'; }
     else if(view === 'done' || view === 'viewer'){ view='formtype'; }
     else return;
     paint();
@@ -649,6 +724,7 @@ function startApp(){
   if(backBtn) backBtn.addEventListener('click', goBack);
   function paint(){
     if(backBtn) backBtn.hidden = (view === 'formtype');
+    root.oninput = null; root.onchange = null;
     window.scrollTo(0,0);
     if(view === 'identify') return paintIdentify();
     if(view === 'register') return paintRegister();
@@ -860,6 +936,7 @@ function startApp(){
     root.querySelectorAll('.sr-v-id').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].idNumber = e.target.value; }));
     root.querySelectorAll('[data-rm]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
+        collectAll(SR_FORM_DEFS[wizardForm]);
         wizardData.visitors.splice(+btn.getAttribute('data-rm'), 1);
         paintWizard();
       });
@@ -868,6 +945,7 @@ function startApp(){
     if(addBtn){
       addBtn.addEventListener('click', ()=>{
         if(wizardData.visitors.length >= 10){ showToast('الحد الأقصى 10 زوار'); return; }
+        collectAll(SR_FORM_DEFS[wizardForm]);
         wizardData.visitors.push({ name:'', nationality:'', idNumber:'' });
         paintWizard();
       });
@@ -881,40 +959,93 @@ function startApp(){
       if(el) wizardData[f.key] = el.value;
     });
   }
+  function collectAll(def){ def.steps.forEach(collectStepValues); }
+
+  // The official-form look: same labels, same order, filled live as the user types.
+  function formTableHtml(def, data){
+    const rows = [];
+    def.steps.forEach(st=> st.fields.forEach(f=>{
+      if(f.type === 'visitorsTable'){
+        (data.visitors && data.visitors.length ? data.visitors : [{}]).forEach((v,i)=>{
+          rows.push(`<tr><td class="k">زائر ${i+1}</td><td>${esc([v.name,v.nationality,v.idNumber].filter(Boolean).join(' — '))}</td></tr>`);
+        });
+      } else {
+        rows.push(`<tr><td class="k">${esc(f.labelAr)}</td><td>${esc(data[f.key]||'')}</td></tr>`);
+      }
+    }));
+    return `<table>${rows.join('')}</table>`;
+  }
+  function submitterRowsHtml(){
+    if(!session) return '';
+    const sub = session.type==='employee' ? ('الرقم الوظيفي ' + (session.employee_no||'')) : (session.rep_id||'');
+    return `<table style="margin-bottom:10px"><tr><td class="k">مقدّم الطلب</td><td>${esc(session.name||'')} ${esc(sub)}</td></tr><tr><td class="k">الجهة / الشركة</td><td>${esc(session.company||'')}</td></tr><tr><td class="k">الجوال</td><td>${esc(session.phone||'')}</td></tr></table>`;
+  }
+  function printForm(def, data, reqId){
+    const today = new Date().toLocaleDateString('ar-SA-u-ca-gregory');
+    srOpenPrintDoc(def.labelAr, srLetterhead() + `<h1>${esc(def.labelAr)}</h1><div class="sub">${reqId ? ('رقم الطلب: '+esc(reqId)+' — ') : ''}${today}</div>` + submitterRowsHtml() + formTableHtml(def, data));
+  }
+
+  function validateForm(def){
+    for(const st of def.steps){
+      const optStep = /إن وجد|إضافية/.test(st.titleAr);
+      if(optStep) continue;
+      const miss = st.fields.find(f=> f.type!=='visitorsTable' && !/contract|previous|unified/i.test(f.key) && !String(wizardData[f.key]||'').trim());
+      if(miss) return 'عبّئ: ' + miss.labelAr;
+    }
+    if(def.steps.some(st=>st.fields.some(f=>f.type==='visitorsTable'))){
+      const vs = (wizardData.visitors||[]).filter(v=>v.name && v.name.trim());
+      if(vs.length === 0) return 'أضف زائرًا واحدًا على الأقل';
+      if((wizardData.visitors||[]).some(v=> (v.name||v.nationality||v.idNumber) && !(v.name && v.nationality && v.idNumber))) return 'أكمل بيانات كل زائر (الاسم والجنسية والهوية)';
+    }
+    if(wizardForm === 'visit_request'){
+      const d1 = new Date(wizardData.visitStart), d2 = new Date(wizardData.visitEnd);
+      const days = Math.round((d2 - d1)/86400000);
+      if(d2 < d1) return 'تاريخ نهاية الزيارة قبل بدايتها';
+      if(days > 2) return 'مدة تصريح الزائر 3 أيام كحد أقصى (72 ساعة)';
+    }
+    return '';
+  }
 
   function paintWizard(){
     const def = SR_FORM_DEFS[wizardForm];
-    const steps = def.steps;
-    const step = steps[wizardStep];
-    const isLast = wizardStep === steps.length - 1;
-
     root.innerHTML = `
-      <div class="glass">
+      <div class="sr-paper" id="sr-pv">
+        ${'<div class="lh"><img src="'+srAbs('../brand/letterhead.png')+'" alt=""></div>'}
+        <h1>${esc(def.labelAr)}</h1>
+        ${submitterRowsHtml()}
+        <div id="sr-pv-table"></div>
+      </div>
+      <div class="glass" style="margin-top:14px">
         <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>
-        <div class="sr-progress" style="margin-top:14px">
-          ${steps.map((s,i)=>`<span class="dot ${i<wizardStep?'done':(i===wizardStep?'active':'')}"></span>`).join('')}
-        </div>
-        <div class="sr-step-title">${esc(step.titleAr||'')}</div>
-        ${step.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
-        <div class="sr-wizard-actions">
-          ${wizardStep>0 ? `<button class="btn ghost" id="sr-w-back">السابق</button>` : `<button class="btn ghost" id="sr-w-cancel">إلغاء</button>`}
-          <button class="btn primary" id="sr-w-next">${isLast?'إرسال الطلب':'التالي'}</button>
+        <p class="muted" style="text-align:center;margin:6px 0 0">${wizardForm==='visit_request' ? 'مدة تصريح الزائر: 3 أيام كحد أقصى (72 ساعة).' : 'عبّئ الحقول وسيظهر الشكل الرسمي في الأعلى مباشرة.'}</p>
+        ${def.steps.map(st=>`
+          <div class="sr-step-title" style="margin-top:18px">${esc(st.titleAr||'')}</div>
+          ${st.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
+        `).join('')}
+        <div class="sr-wizard-actions" style="margin-top:18px">
+          <button class="btn ghost" id="sr-w-print" type="button">طباعة النموذج</button>
+          <button class="btn primary" id="sr-w-next" type="button">إرسال الطلب</button>
         </div>
       </div>
     `;
+    function refresh(){ collectAll(def); root.querySelector('#sr-pv-table').innerHTML = formTableHtml(def, wizardData); }
+    refresh();
+    root.oninput = refresh; root.onchange = refresh;
     wireVisitorsTable();
-
-    const backBtn = root.querySelector('#sr-w-back');
-    if(backBtn) backBtn.addEventListener('click', ()=>{ collectStepValues(step); wizardStep--; paint(); });
-    const cancelBtn = root.querySelector('#sr-w-cancel');
-    if(cancelBtn) cancelBtn.addEventListener('click', ()=>{ view='formtype'; paint(); });
-
+    const endEl = root.querySelector('#sr-f-visitEnd'), startEl = root.querySelector('#sr-f-visitStart');
+    if(startEl && endEl){
+      const lim = ()=>{
+        if(!startEl.value){ endEl.removeAttribute('max'); endEl.removeAttribute('min'); return; }
+        const d = new Date(startEl.value); endEl.min = startEl.value;
+        d.setDate(d.getDate()+2); endEl.max = d.toISOString().slice(0,10);
+      };
+      startEl.addEventListener('change', lim); lim();
+    }
+    root.querySelector('#sr-w-print').addEventListener('click', ()=>{ refresh(); printForm(def, wizardData, ''); });
     root.querySelector('#sr-w-next').addEventListener('click', async ()=>{
-      collectStepValues(step);
-      const optStep = /إن وجد|إضافية/.test(step.titleAr);
-      const missing = optStep ? null : step.fields.find(f=> f.type!=='visitorsTable' && !/contract|previous|unified/i.test(f.key) && !String(wizardData[f.key]||'').trim());
-      if(missing){ showToast('عبّئ: ' + missing.labelAr); return; }
-      if(!isLast){ wizardStep++; paint(); return; }
+      collectAll(def);
+      const err = validateForm(def);
+      if(err){ showToast(err); return; }
       const btn = root.querySelector('#sr-w-next');
       btn.disabled = true; btn.textContent = 'جار الإرسال...';
       try{
@@ -928,6 +1059,7 @@ function startApp(){
         });
         if(res.ok){
           lastRequestId = res.id;
+          lastSubmitted = { def, data: JSON.parse(JSON.stringify(wizardData)) };
           view = 'done';
           paint();
         }else{
@@ -949,9 +1081,11 @@ function startApp(){
         <div class="muted" style="margin-top:6px">رقم الطلب</div>
         <div class="sr-big-id">${esc(lastRequestId)}</div>
         <p class="muted" style="margin-top:6px">راح يوصلك إيميل فور مراجعته</p>
-        <button class="btn primary block" id="sr-done-another" style="margin-top:16px">تقديم طلب آخر</button>
+        <button class="btn block" id="sr-done-print" style="margin-top:16px">طباعة طلبك</button>
+        <button class="btn primary block" id="sr-done-another" style="margin-top:10px">تقديم طلب آخر</button>
       </div>
     `;
+    root.querySelector('#sr-done-print').addEventListener('click', ()=>{ if(lastSubmitted) printForm(lastSubmitted.def, lastSubmitted.data, lastRequestId); });
     root.querySelector('#sr-done-another').addEventListener('click', ()=>{ view='formtype'; paint(); });
   }
 

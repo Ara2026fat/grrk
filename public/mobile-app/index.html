@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T09:08:46Z', dmy: '30/10/2026', hm: '12:08' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T09:17:29Z', dmy: '30/10/2026', hm: '12:17' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5561,6 +5561,18 @@ const CSS_SERVICEREQUESTS = `
 .sr-status-badge-pending{ background:rgba(255,193,104,.16); color:var(--warn) }
 .sr-status-badge-approved{ background:rgba(31,158,99,.15); color:var(--ok) }
 .sr-status-badge-rejected{ background:rgba(255,107,129,.14); color:var(--danger) }
+#sr-print{ display:none }
+@media print{
+  body > *:not(#sr-print){ display:none !important }
+  #sr-print{ display:block !important; padding:24px; color:#000; background:#fff; font-family:inherit; direction:rtl }
+  #sr-print h1{ font-size:18px; text-align:center; margin:0 0 4px }
+  #sr-print .sub{ text-align:center; font-size:12px; margin-bottom:16px }
+  #sr-print table{ width:100%; border-collapse:collapse; font-size:13px }
+  #sr-print td{ border:1px solid #444; padding:7px 9px; vertical-align:top }
+  #sr-print td.k{ width:38%; background:#eee; font-weight:700 }
+  #sr-print .appr{ margin-top:22px; border:1px solid #444; padding:12px; display:flex; justify-content:space-between; align-items:center; min-height:110px }
+  #sr-print .appr img{ max-width:130px; max-height:110px }
+}
 .sr-detail-row{ display:flex; justify-content:space-between; gap:10px; padding:10px 2px; border-bottom:1px dashed var(--line); font-size:13.5px }
 .sr-detail-row:last-child{ border-bottom:0 }
 .sr-detail-row .k{ color:var(--ink-soft) }
@@ -5584,7 +5596,10 @@ const SR_DEFAULT_CFG = {
   url: 'https://script.google.com/macros/s/AKfycbyHSZZ3ZaNP9PuLayeQinDHhtS9PxfhnHD-6_XKka-rNqT0nVw8OSFnxFnEIJRYMQCsaQ/exec',
   token: 'grrk-vw0m8nmgaj'
 };
-function srLoadCfg(){ try{ const c = JSON.parse(localStorage.getItem(SR_CFG_KEY)); return (c && c.url && c.token) ? c : { ...SR_DEFAULT_CFG }; }catch(e){ return { ...SR_DEFAULT_CFG }; } }
+function srLoadCfg(){ try{ const c = JSON.parse(localStorage.getItem(SR_CFG_KEY)); return (c && c.url && c.token) ? c : { ...SR_DEFAULT_CFG, ...(c||{}) }; }catch(e){ return { ...SR_DEFAULT_CFG }; } }
+const SR_STAMP_KEY = 'grrk_sr_stamp_v1';
+function srLoadStamp(){ try{ return localStorage.getItem(SR_STAMP_KEY)||''; }catch(e){ return ''; } }
+function srSaveStamp(d){ try{ if(d) localStorage.setItem(SR_STAMP_KEY,d); else localStorage.removeItem(SR_STAMP_KEY); }catch(e){} }
 function srSaveCfg(c){ try{ localStorage.setItem(SR_CFG_KEY, JSON.stringify(c)); }catch(e){} }
 function srLoadSession(){ try{ return JSON.parse(localStorage.getItem(SR_SESSION_KEY)) || null; }catch(e){ return null; } }
 function srSaveSession(s){ try{ localStorage.setItem(SR_SESSION_KEY, JSON.stringify(s)); }catch(e){} }
@@ -5793,6 +5808,11 @@ function renderServiceRequests(root, ctx){
       <div class="card">
         <div class="field"><label>Web App URL</label><input type="text" id="sr-cfg-url" dir="ltr" value="${esc(cfg.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
         <div class="field"><label>Token</label><input type="text" id="sr-cfg-token" dir="ltr" value="${esc(cfg.token||'')}"></div>
+        <div class="field"><label>${isAr?'مفتاح الأدمن (يُحفظ على جوالك فقط)':'Admin key (kept on this device only)'}</label><input type="text" id="sr-cfg-admin" dir="ltr" value="${esc(cfg.adminToken||'')}" placeholder="adm-..."></div>
+        <div class="field"><label>${isAr?'صورة الختم (اختياري — تظهر على النموذج المعتمد)':'Stamp image (optional — printed on approved forms)'}</label>
+          <input type="file" id="sr-cfg-stamp" accept="image/*">
+          ${srLoadStamp()?`<img src="${srLoadStamp()}" style="max-width:120px;max-height:120px;margin-top:8px;display:block"><button type="button" class="btn ghost" id="sr-cfg-stamp-del" style="margin-top:6px">${isAr?'حذف الختم':'Remove stamp'}</button>`:''}
+        </div>
         <button class="btn primary block" id="sr-cfg-save">${isAr?'حفظ':'Save'}</button>
         ${configured ? `<button class="btn ghost block" id="sr-cfg-back" style="margin-top:10px">${isAr?'رجوع':'Back'}</button>` : ''}
       </div>
@@ -5801,11 +5821,21 @@ function renderServiceRequests(root, ctx){
       const url = root.querySelector('#sr-cfg-url').value.trim();
       const token = root.querySelector('#sr-cfg-token').value.trim();
       if(!url || !token){ ctx.showToast(isAr?'عبّئ الحقلين':'Fill both fields'); return; }
-      srSaveCfg({url, token});
+      const adminToken = root.querySelector('#sr-cfg-admin').value.trim();
+      srSaveCfg({url, token, adminToken});
       ctx.showToast(isAr?'تم الحفظ':'Saved');
       view = 'landing';
       paint();
     });
+    const stampIn = root.querySelector('#sr-cfg-stamp');
+    stampIn.addEventListener('change', ()=>{
+      const f = stampIn.files[0]; if(!f) return;
+      const rd = new FileReader();
+      rd.onload = ()=>{ srSaveStamp(rd.result); ctx.showToast(isAr?'تم حفظ الختم':'Stamp saved'); paint(); };
+      rd.readAsDataURL(f);
+    });
+    const stampDel = root.querySelector('#sr-cfg-stamp-del');
+    if(stampDel) stampDel.addEventListener('click', ()=>{ srSaveStamp(''); paint(); });
     const back = root.querySelector('#sr-cfg-back');
     if(back) back.addEventListener('click', ()=>{ view='landing'; paint(); });
   }
@@ -6072,6 +6102,9 @@ function renderServiceRequests(root, ctx){
 
     root.querySelector('#sr-w-next').addEventListener('click', async ()=>{
       collectStepValues(step);
+      const optStep = /إن وجد|إضافية/.test(step.titleAr);
+      const missing = optStep ? null : step.fields.find(f=> f.type!=='visitorsTable' && !/contract|previous|unified/i.test(f.key) && !String(wizardData[f.key]||'').trim());
+      if(missing){ ctx.showToast('عبّئ: ' + missing.labelAr); return; }
       if(!isLast){ wizardStep++; paint(); return; }
       const btn = root.querySelector('#sr-w-next');
       btn.disabled = true; btn.textContent = isAr?'جار الإرسال...':'Submitting...';
@@ -6129,8 +6162,9 @@ function renderServiceRequests(root, ctx){
       <div class="sr-loading" id="sr-inbox-loading">${isAr?'جار التحميل...':'Loading...'}</div>
     `;
     try{
-      const res = await srApiGet(cfg.url, { token:cfg.token, action:'list' });
-      if(!res.ok){ root.querySelector('#sr-inbox-loading').textContent = isAr?'تعذر التحميل':'Failed to load'; return; }
+      if(!cfg.adminToken){ root.querySelector('#sr-inbox-loading').innerHTML = (isAr?'أدخل مفتاح الأدمن أولًا من الإعدادات':'Enter the admin key in settings first') + '<br><button class="btn primary" id="sr-inbox-cfg" style="margin-top:12px">'+(isAr?'الإعدادات':'Settings')+'</button>'; root.querySelector('#sr-inbox-cfg').addEventListener('click', ()=>{ view='config'; paint(); }); return; }
+      const res = await srApiGet(cfg.url, { token:cfg.token, admin_token:cfg.adminToken, action:'list' });
+      if(!res.ok){ root.querySelector('#sr-inbox-loading').textContent = res.error==='admin_only' ? (isAr?'مفتاح الأدمن غير صحيح':'Wrong admin key') : (isAr?'تعذر التحميل':'Failed to load'); return; }
       const items = (res.requests||[]).sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
       if(items.length === 0){
         root.querySelector('#sr-inbox-loading').outerHTML = `<div class="empty">${isAr?'لا توجد طلبات بعد':'No requests yet'}</div>`;
@@ -6162,14 +6196,47 @@ function renderServiceRequests(root, ctx){
     }
   }
 
+  function srLabelMap(def){
+    const m = {};
+    if(def) def.steps.forEach(st=> st.fields.forEach(f=>{ m[f.key] = f.labelAr; }));
+    return m;
+  }
+
+  function printApproved(r, def, label, payload, labels, note){
+    const old = document.getElementById('sr-print'); if(old) old.remove();
+    const stamp = srLoadStamp();
+    const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>`<tr><td class="k">${esc(labels[k]||k)}</td><td>${esc(payload[k])}</td></tr>`).join('');
+    const vis = Array.isArray(payload.visitors) ? payload.visitors.map((v,i)=>`<tr><td class="k">زائر ${i+1}</td><td>${esc(v.name)} — ${esc(v.nationality)} — ${esc(v.idNumber)}</td></tr>`).join('') : '';
+    const el = document.createElement('div');
+    el.id = 'sr-print';
+    el.innerHTML = `
+      <h1>${esc(label)}</h1>
+      <div class="sub">رقم الطلب: ${esc(r.id)} — ${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}</div>
+      <table>
+        <tr><td class="k">مقدّم الطلب</td><td>${esc(r.submitter_name)}</td></tr>
+        <tr><td class="k">الجهة / الشركة</td><td>${esc(r.company||'-')}</td></tr>
+        <tr><td class="k">الجوال</td><td>${esc(r.submitter_phone||'-')}</td></tr>
+        ${rows}${vis}
+      </table>
+      <div class="appr">
+        <div><b>الحالة: معتمد</b><br>${note?('ملاحظة: '+esc(note)+'<br>'):''}${new Date().toLocaleDateString('ar-SA-u-ca-gregory')}</div>
+        ${stamp?`<img src="${stamp}">`:'<div style="width:130px;height:90px;border:1px dashed #888;display:grid;place-items:center;font-size:11px">مكان الختم</div>'}
+      </div>`;
+    document.body.appendChild(el);
+    window.addEventListener('afterprint', ()=>{ const e=document.getElementById('sr-print'); if(e) e.remove(); }, { once:true });
+    setTimeout(()=> window.print(), 150);
+  }
+
   function openInboxDetail(r){
     const def = SR_FORM_DEFS[r.form_type];
     const label = def ? def.labelAr : r.form_type;
     const payload = r.payload || {};
-    const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>({k, v:payload[k]}));
+    const labels = srLabelMap(def);
+    const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>({k:labels[k]||k, v:payload[k]}));
     const visitorsHtml = Array.isArray(payload.visitors) ? payload.visitors.map((v,i)=>`
       <div class="sr-detail-row"><span class="k">${isAr?'زائر':'Visitor'} ${i+1}</span><span class="v">${esc(v.name)} — ${esc(v.nationality)} — ${esc(v.idNumber)}</span></div>
     `).join('') : '';
+    const pending = r.status === 'قيد المراجعة';
     const html = `
       <div class="sheet glass">
         <div class="h2" style="margin-bottom:4px">${esc(label)}</div>
@@ -6180,12 +6247,14 @@ function renderServiceRequests(root, ctx){
         ${rows.map(x=>`<div class="sr-detail-row"><span class="k">${esc(x.k)}</span><span class="v">${esc(x.v)}</span></div>`).join('')}
         ${visitorsHtml}
         <div class="sr-detail-row"><span class="k">${isAr?'الحالة':'Status'}</span><span class="v"><span class="badge ${statusClass(r.status)}">${esc(SR_STATUS_LABEL[r.status]||r.status)}</span></span></div>
-        ${r.status === 'قيد المراجعة' ? `
+        ${pending ? `
+          <div class="field" style="margin-top:12px"><label>${isAr?'ملاحظة (اختياري — تصل للمندوب بالإيميل)':'Note (optional — emailed to the representative)'}</label><textarea id="sr-note" rows="2"></textarea></div>
           <div class="sr-wizard-actions">
             <button class="btn danger" id="sr-reject-btn">${isAr?'رفض':'Reject'}</button>
             <button class="btn primary" id="sr-approve-btn">${isAr?'اعتماد':'Approve'}</button>
           </div>
         ` : ''}
+        ${r.status === 'معتمد' ? `<button class="btn primary block" id="sr-print-btn" style="margin-top:12px">${isAr?'طباعة / PDF للنموذج المعتمد مع الختم':'Print / PDF approved form with stamp'}</button>` : ''}
         <button class="btn ghost block" id="sr-detail-close" style="margin-top:10px">${isAr?'إغلاق':'Close'}</button>
       </div>
     `;
@@ -6193,15 +6262,20 @@ function renderServiceRequests(root, ctx){
       overlayEl.querySelector('#sr-detail-close').addEventListener('click', ()=> ctx.closeOverlay());
       const approveBtn = overlayEl.querySelector('#sr-approve-btn');
       const rejectBtn = overlayEl.querySelector('#sr-reject-btn');
+      const printBtn = overlayEl.querySelector('#sr-print-btn');
+      if(printBtn) printBtn.addEventListener('click', ()=>{ ctx.closeOverlay(); printApproved(r, def, label, payload, labels, r.notes); });
       async function updateStatus(newStatus){
+        const note = (overlayEl.querySelector('#sr-note')||{}).value || '';
+        if(newStatus==='مرفوض' && !note.trim()){ ctx.showToast(isAr?'اكتب سبب الرفض في الملاحظة':'Add a rejection reason'); return; }
         try{
-          const res = await srApiPost(cfg.url, { token:cfg.token, action:'update_status', id:r.id, new_status:newStatus });
+          const res = await srApiPost(cfg.url, { token:cfg.token, admin_token:cfg.adminToken, action:'update_status', id:r.id, new_status:newStatus, note:note.trim() });
           if(res.ok){
             ctx.showToast(isAr?'تم التحديث':'Updated');
             ctx.closeOverlay();
+            if(newStatus==='معتمد'){ r.status='معتمد'; r.notes=note.trim(); }
             paintInbox();
           }else{
-            ctx.showToast(isAr?'تعذر التحديث':'Update failed');
+            ctx.showToast(res.error==='admin_only' ? (isAr?'مفتاح الأدمن غير صحيح':'Wrong admin key') : (isAr?'تعذر التحديث':'Update failed'));
           }
         }catch(e){ ctx.showToast(isAr?'تعذر الاتصال':'Connection failed'); }
       }

@@ -592,15 +592,16 @@ function startApp(){
     root.innerHTML = `
       <div class="glass" style="margin-bottom:16px">
         <div class="eyebrow">تقديم طلب</div>
-        <p class="muted" style="margin-top:8px">عندك رقم تسجيل سابق؟</p>
+        <p class="muted" style="margin-top:8px">مندوب جديد؟ سجّل مرة واحدة وتحصل على رقمك الخاص.</p>
+        <button class="btn primary block" id="sr-id-new" style="margin-top:14px">مندوب جديد — سجّل الآن</button>
       </div>
       <div class="card">
+        <div class="eyebrow" style="margin-bottom:10px">لديّ رقم تسجيل</div>
         <div class="field"><label>رقم التسجيل (مثال: MND-0001)</label>
           <input type="text" id="sr-id-input" dir="ltr" placeholder="MND-0001">
         </div>
-        <button class="btn primary block" id="sr-id-check">متابعة</button>
+        <button class="btn block" id="sr-id-check">دخول</button>
       </div>
-      <button class="btn ghost block" id="sr-id-new" style="margin-top:12px">ليس عندي رقم — تسجيل جديد</button>
     `;
     root.querySelector('#sr-id-check').addEventListener('click', async ()=>{
       const repId = root.querySelector('#sr-id-input').value.trim();
@@ -615,11 +616,11 @@ function startApp(){
           view = 'formtype'; paint();
         }else{
           showToast('رقم التسجيل غير موجود');
-          btn.disabled = false; btn.textContent = 'متابعة';
+          btn.disabled = false; btn.textContent = 'دخول';
         }
       }catch(e){
         showToast('تعذر الاتصال، حاول مرة أخرى');
-        btn.disabled = false; btn.textContent = 'متابعة';
+        btn.disabled = false; btn.textContent = 'دخول';
       }
     });
     root.querySelector('#sr-id-new').addEventListener('click', ()=>{ view='register'; paint(); });
@@ -638,7 +639,9 @@ function startApp(){
         <div class="field"><label>البريد الإلكتروني</label><input type="email" id="sr-r-email" dir="ltr"></div>
         <button class="btn primary block" id="sr-r-submit">تسجيل</button>
       </div>
+      <button class="btn ghost block" id="sr-r-back" style="margin-top:12px">لديّ رقم تسجيل — رجوع</button>
     `;
+    root.querySelector('#sr-r-back').addEventListener('click', ()=>{ view='identify'; paint(); });
     root.querySelector('#sr-r-submit').addEventListener('click', async ()=>{
       const name = root.querySelector('#sr-r-name').value.trim();
       const company = root.querySelector('#sr-r-company').value.trim();

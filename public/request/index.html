@@ -567,6 +567,21 @@ const SR_FORM_DEFS = {
       ]},
     ],
   },
+  entry_permit: {
+    labelAr:'طلب تصريح دخول أفراد', labelEn:'Personnel Entry Permit Request', icon:'employees', i1:'#9B7BFF', i2:'#5B34C9',
+    steps: [
+      { titleAr:'جهة العمل', fields:[
+        { key:'employerName', type:'text', labelAr:'يعمل لدى (اسم الشركة / الجهة)' },
+      ]},
+      { titleAr:'فترة التصريح (14 يومًا كحد أقصى)', fields:[
+        { key:'permitFrom', type:'date', labelAr:'للفترة من تاريخ' },
+        { key:'permitTo', type:'date', labelAr:'حتى تاريخ' },
+      ]},
+      { titleAr:'بيانات الأفراد (حتى 20 فردًا)', fields:[
+        { key:'visitors', type:'visitorsTable', labelAr:'الأفراد' },
+      ]},
+    ],
+  },
 };
 
 // ===== Service Requests — printable documents (shared by the admin app and the public request page) =====
@@ -674,17 +689,19 @@ function srPrintVisitForm(data, opts){
 }
 
 // "تصريح دخول أفراد" — same layout as the official Word form (20 rows).
-function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, title){
+function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, title, opts){
+  opts = opts || {};
   const fmt = s=> String(s||'').split('-').reverse().join(' / ');
   const rows = [];
   for(let i=0;i<20;i++){
     const p = persons[i] || {};
-    rows.push('<tr><td class="n">' + (i+1) + '</td><td>' + srEsc(p.name||'') + '</td><td>' + srEsc(p.nat||'') + '</td><td>' + srEsc(p.id||'') + '</td><td></td></tr>');
+    rows.push('<tr><td class="n">' + (i+1) + '</td><td>' + srEsc(p.name||'') + '</td><td>' + srEsc(p.nat||'') + '</td><td>' + srEsc(p.id||'') + '</td><td>' + srEsc(p.en||'') + '</td></tr>');
   }
   const body = srWatermark() +
     '<div class="hd"><img src="' + srAbs('../brand/logo-header.png') + '" alt=""><div></div></div>' +
     '<h1>' + srEsc(title||'تصريح دخول أفراد') + '</h1>' +
-    '<div style="display:flex;justify-content:space-between;font-weight:700;margin:10px 0"><span>رقم التصريح : ' + srEsc(r.id) + '</span><span>التاريخ : ' + srToday() + '</span></div>' +
+    (opts.draft ? '<div class="sub" style="color:#b00020;font-weight:700">نسخة الطلب — غير معتمدة حتى يصدرها مشرف علاقات حكومية</div>' : '') +
+    '<div style="display:flex;justify-content:space-between;font-weight:700;margin:10px 0"><span>رقم التصريح : ' + srEsc(opts.number || r.id || '') + '</span><span>التاريخ : ' + srToday() + '</span></div>' +
     '<table class="vt"><tr><th style="width:8%" class="big">عدد</th><th class="big">الاسم</th><th class="big">الجنسية</th><th class="big">رقم الهوية الوطنية / الإقامة / جواز السفر</th><th class="big">الاسم باللغة الانجليزية</th></tr>' + rows.join('') + '</table>' +
     '<p style="text-align:center;margin:14px 0 6px"><b>يصرح للمذكور بياناته أعلاه بالدخول إلى : مدينة رأس الخير للصناعات التعدينية</b></p>' +
     '<div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:6px"><span>للفترة من تاريخ : ' + srEsc(fmt(from)) + '</span><span>حتى تاريخ : ' + srEsc(fmt(to)) + '</span></div>' +
@@ -1011,13 +1028,14 @@ function startApp(){
         ${wizardData.visitors.map((v,i)=>`
           <div class="sr-visitor-row">
             ${wizardData.visitors.length > 1 ? `<button type="button" class="sr-visitor-remove" data-rm="${i}">${iconTrash()}</button>` : ''}
-            <div class="field" style="margin-bottom:6px"><label>اسم الزائر ${i+1}</label><input type="text" class="sr-v-name" data-idx="${i}" value="${esc(v.name)}"></div>
+            <div class="field" style="margin-bottom:6px"><label>${wizardForm==='entry_permit' ? 'اسم الفرد' : 'اسم الزائر'} ${i+1}</label><input type="text" class="sr-v-name" data-idx="${i}" value="${esc(v.name)}"></div>
             <div class="field" style="margin-bottom:6px"><label>الجنسية</label><input type="text" class="sr-v-nat" data-idx="${i}" value="${esc(v.nationality)}"></div>
             <div class="field" style="margin-bottom:0"><label>رقم الهوية / الإقامة / الجواز</label><input type="text" class="sr-v-id" data-idx="${i}" dir="ltr" value="${esc(v.idNumber)}"></div>
+            ${wizardForm==='entry_permit' ? `<div class="field" style="margin-top:6px;margin-bottom:0"><label>الاسم باللغة الانجليزية</label><input type="text" class="sr-v-en" data-idx="${i}" dir="ltr" value="${esc(v.englishName||'')}"></div>` : ''}
           </div>
         `).join('')}
       </div>
-      <button type="button" class="btn ghost sr-add-visitor" id="sr-add-visitor">+ إضافة زائر</button>
+      <button type="button" class="btn ghost sr-add-visitor" id="sr-add-visitor">${wizardForm==='entry_permit' ? '+ إضافة فرد' : '+ إضافة زائر'}</button>
     `;
   }
 
@@ -1026,6 +1044,7 @@ function startApp(){
     if(!wrap) return;
     root.querySelectorAll('.sr-v-name').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].name = e.target.value; }));
     root.querySelectorAll('.sr-v-nat').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].nationality = e.target.value; }));
+    root.querySelectorAll('.sr-v-en').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].englishName = e.target.value; }));
     root.querySelectorAll('.sr-v-id').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].idNumber = e.target.value; }));
     root.querySelectorAll('[data-rm]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -1037,7 +1056,8 @@ function startApp(){
     const addBtn = root.querySelector('#sr-add-visitor');
     if(addBtn){
       addBtn.addEventListener('click', ()=>{
-        if(wizardData.visitors.length >= 15){ showToast('الحد الأقصى 15 زائرًا'); return; }
+        const maxV = wizardForm==='entry_permit' ? 20 : 15;
+        if(wizardData.visitors.length >= maxV){ showToast('الحد الأقصى ' + maxV); return; }
         collectAll(SR_FORM_DEFS[wizardForm]);
         wizardData.visitors.push({ name:'', nationality:'', idNumber:'' });
         paintWizard();
@@ -1060,7 +1080,7 @@ function startApp(){
     def.steps.forEach(st=> st.fields.forEach(f=>{
       if(f.type === 'visitorsTable'){
         (data.visitors && data.visitors.length ? data.visitors : [{}]).forEach((v,i)=>{
-          rows.push(`<tr><td class="k">زائر ${i+1}</td><td>${esc([v.name,v.nationality,v.idNumber].filter(Boolean).join(' — '))}</td></tr>`);
+          rows.push(`<tr><td class="k">${wizardForm==='entry_permit'?'فرد':'زائر'} ${i+1}</td><td>${esc([v.name,v.nationality,v.idNumber,v.englishName].filter(Boolean).join(' — '))}</td></tr>`);
         });
       } else {
         rows.push(`<tr><td class="k">${esc(f.labelAr)}</td><td>${esc(data[f.key]||'')}</td></tr>`);
@@ -1075,6 +1095,10 @@ function startApp(){
   }
   function printForm(def, data, reqId){
     if(def === SR_FORM_DEFS.visit_request){ srPrintVisitForm(data, { requestId:reqId }); return; }
+    if(def === SR_FORM_DEFS.entry_permit){
+      srPrintPermit({ id: reqId || '' }, (data.visitors||[]).map(v=>({ name:v.name, nat:v.nationality, id:v.idNumber, en:v.englishName })), data.permitFrom||'', data.permitTo||'', '', data.employerName||'', '', 'تصريح دخول أفراد', { draft:true });
+      return;
+    }
     const today = new Date().toLocaleDateString('ar-SA-u-ca-gregory');
     srOpenPrintDoc(def.labelAr, srLetterhead() + `<h1>${esc(def.labelAr)}</h1><div class="sub">${reqId ? ('رقم الطلب: '+esc(reqId)+' — ') : ''}${today}</div>` + submitterRowsHtml() + formTableHtml(def, data));
   }
@@ -1088,7 +1112,7 @@ function startApp(){
     }
     if(def.steps.some(st=>st.fields.some(f=>f.type==='visitorsTable'))){
       const vs = (wizardData.visitors||[]).filter(v=>v.name && v.name.trim());
-      if(vs.length === 0) return 'أضف زائرًا واحدًا على الأقل';
+      if(vs.length === 0) return wizardForm==='entry_permit' ? 'أضف فردًا واحدًا على الأقل' : 'أضف زائرًا واحدًا على الأقل';
       if((wizardData.visitors||[]).some(v=> (v.name||v.nationality||v.idNumber) && !(v.name && v.nationality && v.idNumber))) return 'أكمل بيانات كل زائر (الاسم والجنسية والهوية)';
     }
     if(wizardForm === 'visit_request'){
@@ -1096,6 +1120,12 @@ function startApp(){
       const days = Math.round((d2 - d1)/86400000);
       if(d2 < d1) return 'تاريخ نهاية الزيارة قبل بدايتها';
       if(days > 2) return 'مدة تصريح الزائر 3 أيام كحد أقصى (72 ساعة)';
+    }
+    if(wizardForm === 'entry_permit'){
+      const e1 = new Date(wizardData.permitFrom), e2 = new Date(wizardData.permitTo);
+      const ed = Math.round((e2 - e1)/86400000);
+      if(e2 < e1) return 'تاريخ نهاية التصريح قبل بدايته';
+      if(ed > 13) return 'مدة تصريح دخول الأفراد 14 يومًا كحد أقصى (أسبوعان)';
     }
     return '';
   }
@@ -1111,7 +1141,7 @@ function startApp(){
       </div>
       <div class="glass" style="margin-top:14px">
         <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>
-        <p class="muted" style="text-align:center;margin:6px 0 0">${wizardForm==='visit_request' ? 'مدة تصريح الزائر: 3 أيام كحد أقصى (72 ساعة).' : 'عبّئ الحقول وسيظهر الشكل الرسمي في الأعلى مباشرة.'}</p>
+        <p class="muted" style="text-align:center;margin:6px 0 0">${wizardForm==='visit_request' ? 'مدة تصريح الزائر: 3 أيام كحد أقصى (72 ساعة).' : wizardForm==='entry_permit' ? 'مدة تصريح دخول الأفراد: 14 يومًا كحد أقصى (أسبوعان).' : 'عبّئ الحقول وسيظهر الشكل الرسمي في الأعلى مباشرة.'}</p>
         ${def.steps.map(st=>`
           <div class="sr-step-title" style="margin-top:18px">${esc(st.titleAr||'')}</div>
           ${st.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
@@ -1126,12 +1156,13 @@ function startApp(){
     refresh();
     root.oninput = refresh; root.onchange = refresh;
     wireVisitorsTable();
-    const endEl = root.querySelector('#sr-f-visitEnd'), startEl = root.querySelector('#sr-f-visitStart');
+    const pair = wizardForm==='entry_permit' ? ['permitFrom','permitTo',13] : ['visitStart','visitEnd',2];
+    const endEl = root.querySelector('#sr-f-'+pair[1]), startEl = root.querySelector('#sr-f-'+pair[0]);
     if(startEl && endEl){
       const lim = ()=>{
         if(!startEl.value){ endEl.removeAttribute('max'); endEl.removeAttribute('min'); return; }
         const d = new Date(startEl.value); endEl.min = startEl.value;
-        d.setDate(d.getDate()+2); endEl.max = d.toISOString().slice(0,10);
+        d.setDate(d.getDate()+pair[2]); endEl.max = d.toISOString().slice(0,10);
       };
       startEl.addEventListener('change', lim); lim();
     }

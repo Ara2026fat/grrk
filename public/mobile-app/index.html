@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T14:08:33Z', dmy: '30/10/2026', hm: '17:08' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T14:31:00Z', dmy: '30/10/2026', hm: '17:31' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -632,7 +632,7 @@ const CSS_DASHBOARD = `
 /* One-tap shortcuts straight into a specific service-request form (or the
    inbox), right on the home screen — it used to take 4-5 taps buried
    inside Documents & Monitoring, then another tap to pick the form. */
-.dash-sr-quick{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px }
+.dash-sr-quick{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px }
 .dash-sr-quick-card{
   display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; width:100%; min-width:0;
   background:var(--flat); border:1px solid var(--flat-line); border-radius:var(--radius-md);
@@ -5623,17 +5623,19 @@ function srPrintVisitForm(data, opts){
 }
 
 // "تصريح دخول أفراد" — same layout as the official Word form (20 rows).
-function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, title){
+function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, title, opts){
+  opts = opts || {};
   const fmt = s=> String(s||'').split('-').reverse().join(' / ');
   const rows = [];
   for(let i=0;i<20;i++){
     const p = persons[i] || {};
-    rows.push('<tr><td class="n">' + (i+1) + '</td><td>' + srEsc(p.name||'') + '</td><td>' + srEsc(p.nat||'') + '</td><td>' + srEsc(p.id||'') + '</td><td></td></tr>');
+    rows.push('<tr><td class="n">' + (i+1) + '</td><td>' + srEsc(p.name||'') + '</td><td>' + srEsc(p.nat||'') + '</td><td>' + srEsc(p.id||'') + '</td><td>' + srEsc(p.en||'') + '</td></tr>');
   }
   const body = srWatermark() +
     '<div class="hd"><img src="' + srAbs('../brand/logo-header.png') + '" alt=""><div></div></div>' +
     '<h1>' + srEsc(title||'تصريح دخول أفراد') + '</h1>' +
-    '<div style="display:flex;justify-content:space-between;font-weight:700;margin:10px 0"><span>رقم التصريح : ' + srEsc(r.id) + '</span><span>التاريخ : ' + srToday() + '</span></div>' +
+    (opts.draft ? '<div class="sub" style="color:#b00020;font-weight:700">نسخة الطلب — غير معتمدة حتى يصدرها مشرف علاقات حكومية</div>' : '') +
+    '<div style="display:flex;justify-content:space-between;font-weight:700;margin:10px 0"><span>رقم التصريح : ' + srEsc(opts.number || r.id || '') + '</span><span>التاريخ : ' + srToday() + '</span></div>' +
     '<table class="vt"><tr><th style="width:8%" class="big">عدد</th><th class="big">الاسم</th><th class="big">الجنسية</th><th class="big">رقم الهوية الوطنية / الإقامة / جواز السفر</th><th class="big">الاسم باللغة الانجليزية</th></tr>' + rows.join('') + '</table>' +
     '<p style="text-align:center;margin:14px 0 6px"><b>يصرح للمذكور بياناته أعلاه بالدخول إلى : مدينة رأس الخير للصناعات التعدينية</b></p>' +
     '<div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:6px"><span>للفترة من تاريخ : ' + srEsc(fmt(from)) + '</span><span>حتى تاريخ : ' + srEsc(fmt(to)) + '</span></div>' +
@@ -5736,10 +5738,13 @@ function srLoadStamp(){ try{ return localStorage.getItem(SR_STAMP_KEY)||''; }cat
 function srSaveStamp(d){ try{ if(d) localStorage.setItem(SR_STAMP_KEY,d); else localStorage.removeItem(SR_STAMP_KEY); }catch(e){} }
 
 const SR_SUPERVISOR_KEY = 'grrk_sr_supervisor_v1';
-const SR_PERMIT_RULES = { badge:{ max:14, title:'تصريح دخول أفراد', limit:'14 يومًا (أسبوعان)' } };
-function srPermitPersons(r){
-  const p = r.payload || {};
-  return [{ name:p.fullName, nat:p.nationality, id:p.idNumber }];
+let srLastInbox = [];
+function srSupervisor(){ let v = ''; try{ v = localStorage.getItem(SR_SUPERVISOR_KEY) || ''; }catch(e){} return v || 'بندر سرحان الخالدي'; }
+function srPermitNumber(r){
+  const same = srLastInbox.filter(x=>x.form_type==='entry_permit').sort((x,y)=> new Date(x.timestamp) - new Date(y.timestamp));
+  const i = same.findIndex(x=>x.id===r.id);
+  const yr = new Date(r.timestamp).getFullYear() || new Date().getFullYear();
+  return String((i<0 ? same.length+1 : i+1)).padStart(3,'0') + '/' + yr;
 }
 function srDefaultStamp(){ return srLoadStamp() || srAbs('../brand/dept-stamp.png'); }
 function srSaveCfg(c){ try{ localStorage.setItem(SR_CFG_KEY, JSON.stringify(c)); }catch(e){} }
@@ -5872,6 +5877,21 @@ const SR_FORM_DEFS = {
       ]},
     ],
   },
+  entry_permit: {
+    labelAr:'طلب تصريح دخول أفراد', labelEn:'Personnel Entry Permit Request', icon:'employees', i1:'#9B7BFF', i2:'#5B34C9',
+    steps: [
+      { titleAr:'جهة العمل', fields:[
+        { key:'employerName', type:'text', labelAr:'يعمل لدى (اسم الشركة / الجهة)' },
+      ]},
+      { titleAr:'فترة التصريح (14 يومًا كحد أقصى)', fields:[
+        { key:'permitFrom', type:'date', labelAr:'للفترة من تاريخ' },
+        { key:'permitTo', type:'date', labelAr:'حتى تاريخ' },
+      ]},
+      { titleAr:'بيانات الأفراد (حتى 20 فردًا)', fields:[
+        { key:'visitors', type:'visitorsTable', labelAr:'الأفراد' },
+      ]},
+    ],
+  },
 };
 
 function renderServiceRequests(root, ctx){
@@ -5975,6 +5995,7 @@ function renderServiceRequests(root, ctx){
         <div class="field"><label>Web App URL</label><input type="text" id="sr-cfg-url" dir="ltr" value="${esc(cfg.url||'')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
         <div class="field"><label>Token</label><input type="text" id="sr-cfg-token" dir="ltr" value="${esc(cfg.token||'')}"></div>
         <div class="field"><label>${isAr?'مفتاح الأدمن (يُحفظ على جوالك فقط)':'Admin key (kept on this device only)'}</label><input type="text" id="sr-cfg-admin" dir="ltr" value="${esc(cfg.adminToken||'')}" placeholder="adm-..."></div>
+        <div class="field"><label>اسم مشرف علاقات حكومية (يظهر في تصريح دخول الأفراد)</label><input type="text" id="sr-cfg-sup" value="${esc(srSupervisor())}"></div>
         <div class="field"><label>${isAr?'صورة الختم (اختياري — تظهر على النموذج المعتمد)':'Stamp image (optional — printed on approved forms)'}</label>
           <input type="file" id="sr-cfg-stamp" accept="image/*">
           ${srLoadStamp()?`<img src="${srLoadStamp()}" style="max-width:120px;max-height:120px;margin-top:8px;display:block"><button type="button" class="btn ghost" id="sr-cfg-stamp-del" style="margin-top:6px">${isAr?'حذف الختم':'Remove stamp'}</button>`:''}
@@ -5989,6 +6010,7 @@ function renderServiceRequests(root, ctx){
       if(!url || !token){ ctx.showToast(isAr?'عبّئ الحقلين':'Fill both fields'); return; }
       const adminToken = root.querySelector('#sr-cfg-admin').value.trim();
       srSaveCfg({url, token, adminToken});
+      try{ localStorage.setItem(SR_SUPERVISOR_KEY, root.querySelector('#sr-cfg-sup').value.trim()); }catch(e){}
       ctx.showToast(isAr?'تم الحفظ':'Saved');
       view = 'landing';
       paint();
@@ -6231,13 +6253,14 @@ function renderServiceRequests(root, ctx){
         ${wizardData.visitors.map((v,i)=>`
           <div class="sr-visitor-row">
             ${wizardData.visitors.length > 1 ? `<button type="button" class="sr-visitor-remove" data-rm="${i}">${iconTrash()}</button>` : ''}
-            <div class="field" style="margin-bottom:6px"><label>${isAr?`اسم الزائر ${i+1}`:`Visitor ${i+1} name`}</label><input type="text" class="sr-v-name" data-idx="${i}" value="${esc(v.name)}"></div>
+            <div class="field" style="margin-bottom:6px"><label>${wizardForm==='entry_permit' ? `اسم الفرد ${i+1}` : (isAr?`اسم الزائر ${i+1}`:`Visitor ${i+1} name`)}</label><input type="text" class="sr-v-name" data-idx="${i}" value="${esc(v.name)}"></div>
             <div class="field" style="margin-bottom:6px"><label>${isAr?'الجنسية':'Nationality'}</label><input type="text" class="sr-v-nat" data-idx="${i}" value="${esc(v.nationality)}"></div>
             <div class="field" style="margin-bottom:0"><label>${isAr?'رقم الهوية / الإقامة / الجواز':'ID / Iqama / Passport No.'}</label><input type="text" class="sr-v-id" data-idx="${i}" dir="ltr" value="${esc(v.idNumber)}"></div>
+            ${wizardForm==='entry_permit' ? `<div class="field" style="margin-top:6px;margin-bottom:0"><label>الاسم باللغة الانجليزية</label><input type="text" class="sr-v-en" data-idx="${i}" dir="ltr" value="${esc(v.englishName||'')}"></div>` : ''}
           </div>
         `).join('')}
       </div>
-      <button type="button" class="btn ghost sr-add-visitor" id="sr-add-visitor">${isAr?'+ إضافة زائر':'+ Add visitor'}</button>
+      <button type="button" class="btn ghost sr-add-visitor" id="sr-add-visitor">${wizardForm==='entry_permit' ? '+ إضافة فرد' : (isAr?'+ إضافة زائر':'+ Add visitor')}</button>
     `;
   }
 
@@ -6246,6 +6269,7 @@ function renderServiceRequests(root, ctx){
     if(!wrap) return;
     root.querySelectorAll('.sr-v-name').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].name = e.target.value; }));
     root.querySelectorAll('.sr-v-nat').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].nationality = e.target.value; }));
+    root.querySelectorAll('.sr-v-en').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].englishName = e.target.value; }));
     root.querySelectorAll('.sr-v-id').forEach(el=> el.addEventListener('input', e=>{ wizardData.visitors[+e.target.dataset.idx].idNumber = e.target.value; }));
     root.querySelectorAll('[data-rm]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -6257,7 +6281,8 @@ function renderServiceRequests(root, ctx){
     const addBtn = root.querySelector('#sr-add-visitor');
     if(addBtn){
       addBtn.addEventListener('click', ()=>{
-        if(wizardData.visitors.length >= 10){ ctx.showToast(isAr?'الحد الأقصى 10 زوار':'Maximum 10 visitors'); return; }
+        const maxV = wizardForm==='entry_permit' ? 20 : 15;
+        if(wizardData.visitors.length >= maxV){ ctx.showToast('الحد الأقصى ' + maxV); return; }
         collectAll(SR_FORM_DEFS[wizardForm]);
         wizardData.visitors.push({ name:'', nationality:'', idNumber:'' });
         paintWizard();
@@ -6280,7 +6305,7 @@ function renderServiceRequests(root, ctx){
     def.steps.forEach(st=> st.fields.forEach(f=>{
       if(f.type === 'visitorsTable'){
         (data.visitors && data.visitors.length ? data.visitors : [{}]).forEach((v,i)=>{
-          rows.push(`<tr><td class="k">زائر ${i+1}</td><td>${esc([v.name,v.nationality,v.idNumber].filter(Boolean).join(' — '))}</td></tr>`);
+          rows.push(`<tr><td class="k">${wizardForm==='entry_permit'?'فرد':'زائر'} ${i+1}</td><td>${esc([v.name,v.nationality,v.idNumber,v.englishName].filter(Boolean).join(' — '))}</td></tr>`);
         });
       } else {
         rows.push(`<tr><td class="k">${esc(f.labelAr)}</td><td>${esc(data[f.key]||'')}</td></tr>`);
@@ -6295,6 +6320,10 @@ function renderServiceRequests(root, ctx){
   }
   function printForm(def, data, reqId){
     if(def === SR_FORM_DEFS.visit_request){ srPrintVisitForm(data, { requestId:reqId }); return; }
+    if(def === SR_FORM_DEFS.entry_permit){
+      srPrintPermit({ id: reqId || '' }, (data.visitors||[]).map(v=>({ name:v.name, nat:v.nationality, id:v.idNumber, en:v.englishName })), data.permitFrom||'', data.permitTo||'', '', data.employerName||'', '', 'تصريح دخول أفراد', { draft:true });
+      return;
+    }
     const today = new Date().toLocaleDateString('ar-SA-u-ca-gregory');
     srOpenPrintDoc(def.labelAr, srLetterhead() + `<h1>${esc(def.labelAr)}</h1><div class="sub">${reqId ? ('رقم الطلب: '+esc(reqId)+' — ') : ''}${today}</div>` + submitterRowsHtml() + formTableHtml(def, data));
   }
@@ -6308,7 +6337,7 @@ function renderServiceRequests(root, ctx){
     }
     if(def.steps.some(st=>st.fields.some(f=>f.type==='visitorsTable'))){
       const vs = (wizardData.visitors||[]).filter(v=>v.name && v.name.trim());
-      if(vs.length === 0) return 'أضف زائرًا واحدًا على الأقل';
+      if(vs.length === 0) return wizardForm==='entry_permit' ? 'أضف فردًا واحدًا على الأقل' : 'أضف زائرًا واحدًا على الأقل';
       if((wizardData.visitors||[]).some(v=> (v.name||v.nationality||v.idNumber) && !(v.name && v.nationality && v.idNumber))) return 'أكمل بيانات كل زائر (الاسم والجنسية والهوية)';
     }
     if(wizardForm === 'visit_request'){
@@ -6316,6 +6345,12 @@ function renderServiceRequests(root, ctx){
       const days = Math.round((d2 - d1)/86400000);
       if(d2 < d1) return 'تاريخ نهاية الزيارة قبل بدايتها';
       if(days > 2) return 'مدة تصريح الزائر 3 أيام كحد أقصى (72 ساعة)';
+    }
+    if(wizardForm === 'entry_permit'){
+      const e1 = new Date(wizardData.permitFrom), e2 = new Date(wizardData.permitTo);
+      const ed = Math.round((e2 - e1)/86400000);
+      if(e2 < e1) return 'تاريخ نهاية التصريح قبل بدايته';
+      if(ed > 13) return 'مدة تصريح دخول الأفراد 14 يومًا كحد أقصى (أسبوعان)';
     }
     return '';
   }
@@ -6331,7 +6366,7 @@ function renderServiceRequests(root, ctx){
       </div>
       <div class="glass" style="margin-top:14px">
         <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>
-        <p class="muted" style="text-align:center;margin:6px 0 0">${wizardForm==='visit_request' ? 'مدة تصريح الزائر: 3 أيام كحد أقصى (72 ساعة).' : 'عبّئ الحقول وسيظهر الشكل الرسمي في الأعلى مباشرة.'}</p>
+        <p class="muted" style="text-align:center;margin:6px 0 0">${wizardForm==='visit_request' ? 'مدة تصريح الزائر: 3 أيام كحد أقصى (72 ساعة).' : wizardForm==='entry_permit' ? 'مدة تصريح دخول الأفراد: 14 يومًا كحد أقصى (أسبوعان).' : 'عبّئ الحقول وسيظهر الشكل الرسمي في الأعلى مباشرة.'}</p>
         ${def.steps.map(st=>`
           <div class="sr-step-title" style="margin-top:18px">${esc(st.titleAr||'')}</div>
           ${st.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
@@ -6346,12 +6381,13 @@ function renderServiceRequests(root, ctx){
     refresh();
     root.oninput = refresh; root.onchange = refresh;
     wireVisitorsTable();
-    const endEl = root.querySelector('#sr-f-visitEnd'), startEl = root.querySelector('#sr-f-visitStart');
+    const pair = wizardForm==='entry_permit' ? ['permitFrom','permitTo',13] : ['visitStart','visitEnd',2];
+    const endEl = root.querySelector('#sr-f-'+pair[1]), startEl = root.querySelector('#sr-f-'+pair[0]);
     if(startEl && endEl){
       const lim = ()=>{
         if(!startEl.value){ endEl.removeAttribute('max'); endEl.removeAttribute('min'); return; }
         const d = new Date(startEl.value); endEl.min = startEl.value;
-        d.setDate(d.getDate()+2); endEl.max = d.toISOString().slice(0,10);
+        d.setDate(d.getDate()+pair[2]); endEl.max = d.toISOString().slice(0,10);
       };
       startEl.addEventListener('change', lim); lim();
     }
@@ -6421,6 +6457,7 @@ function renderServiceRequests(root, ctx){
       const res = await srApiGet(cfg.url, { token:cfg.token, admin_token:cfg.adminToken||'', action:'list' });
       if(!res.ok){ root.querySelector('#sr-inbox-loading').textContent = res.error==='admin_only' ? (isAr?'مفتاح الأدمن غير صحيح':'Wrong admin key') : (isAr?'تعذر التحميل':'Failed to load'); return; }
       const items = (res.requests||[]).sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
+      srLastInbox = items;
       if(items.length === 0){
         root.querySelector('#sr-inbox-loading').outerHTML = `<div class="empty">${isAr?'لا توجد طلبات بعد':'No requests yet'}</div>`;
         return;
@@ -6459,6 +6496,11 @@ function renderServiceRequests(root, ctx){
 
   function printApproved(r, def, label, payload, labels, note){
     const stamp = srDefaultStamp();
+    if(r.form_type === 'entry_permit'){
+      const persons = (payload.visitors||[]).map(v=>({ name:v.name, nat:v.nationality, id:v.idNumber, en:v.englishName }));
+      srPrintPermit(r, persons, payload.permitFrom, payload.permitTo, srSupervisor(), payload.employerName || r.company, stamp, 'تصريح دخول أفراد', { number: srPermitNumber(r) });
+      return;
+    }
     if(r.form_type === 'visit_request'){
       srPrintVisitForm(payload, { requestId:r.id, statusLine:'معتمد' + (note?(' — '+note):''), stampSrc:stamp });
       return;
@@ -6487,7 +6529,7 @@ function renderServiceRequests(root, ctx){
     const labels = srLabelMap(def);
     const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>({k:labels[k]||k, v:payload[k]}));
     const visitorsHtml = Array.isArray(payload.visitors) ? payload.visitors.map((v,i)=>`
-      <div class="sr-detail-row"><span class="k">${isAr?'زائر':'Visitor'} ${i+1}</span><span class="v">${esc(v.name)} — ${esc(v.nationality)} — ${esc(v.idNumber)}</span></div>
+      <div class="sr-detail-row"><span class="k">${r.form_type==='entry_permit' ? 'فرد' : (isAr?'زائر':'Visitor')} ${i+1}</span><span class="v">${esc(v.name)} — ${esc(v.nationality)} — ${esc(v.idNumber)}${v.englishName?(' — '+esc(v.englishName)):''}</span></div>
     `).join('') : '';
     const pending = r.status === 'قيد المراجعة';
     const html = `
@@ -6507,16 +6549,6 @@ function renderServiceRequests(root, ctx){
             <button class="btn primary" id="sr-approve-btn">${isAr?'اعتماد':'Approve'}</button>
           </div>
         ` : ''}
-        ${(r.status === 'معتمد' && SR_PERMIT_RULES[r.form_type]) ? (()=>{
-          const rule = SR_PERMIT_RULES[r.form_type]; const pl = r.payload||{}; const t0 = new Date().toISOString().slice(0,10);
-          const f0 = (r.form_type==='visit_request' && pl.visitStart) ? pl.visitStart : t0;
-          const e0 = (r.form_type==='visit_request' && pl.visitEnd) ? pl.visitEnd : new Date(Date.now()+(rule.max-1)*86400000).toISOString().slice(0,10);
-          let sup = 'بندر سرحان الخالدي'; try{ sup = localStorage.getItem(SR_SUPERVISOR_KEY) || sup; }catch(e){}
-          return `<div class="card" style="margin-top:12px"><div class="eyebrow">${esc(rule.title)} — الحد الأقصى ${rule.limit}</div>
-            <div class="field"><label>من تاريخ</label><input type="date" id="sr-pm-from" value="${esc(f0)}"></div>
-            <div class="field"><label>حتى تاريخ</label><input type="date" id="sr-pm-to" value="${esc(e0)}"></div>
-            <div class="field"><label>اسم مشرف علاقات حكومية</label><input type="text" id="sr-pm-sup" value="${esc(sup)}"></div>
-            <button class="btn primary block" id="sr-pm-btn" type="button">إصدار ${esc(rule.title)} وطباعته</button></div>`; })() : ''}
         ${r.status === 'معتمد' ? `<button class="btn primary block" id="sr-print-btn" style="margin-top:12px">${isAr?'طباعة / PDF للنموذج المعتمد مع الختم':'Print / PDF approved form with stamp'}</button>` : ''}
         <button class="btn ghost block" id="sr-detail-close" style="margin-top:10px">${isAr?'إغلاق':'Close'}</button>
       </div>
@@ -6526,18 +6558,6 @@ function renderServiceRequests(root, ctx){
       const approveBtn = overlayEl.querySelector('#sr-approve-btn');
       const rejectBtn = overlayEl.querySelector('#sr-reject-btn');
       const printBtn = overlayEl.querySelector('#sr-print-btn');
-      const pmBtn = overlayEl.querySelector('#sr-pm-btn');
-      if(pmBtn) pmBtn.addEventListener('click', ()=>{
-        const rule = SR_PERMIT_RULES[r.form_type];
-        const from = overlayEl.querySelector('#sr-pm-from').value, to = overlayEl.querySelector('#sr-pm-to').value;
-        const sup = overlayEl.querySelector('#sr-pm-sup').value.trim();
-        if(!from || !to){ ctx.showToast('حدد تاريخ البداية والنهاية'); return; }
-        const days = Math.round((new Date(to) - new Date(from))/86400000) + 1;
-        if(days < 1){ ctx.showToast('تاريخ النهاية قبل البداية'); return; }
-        if(days > rule.max){ ctx.showToast('المدة تتجاوز الحد الأقصى: ' + rule.limit); return; }
-        try{ localStorage.setItem(SR_SUPERVISOR_KEY, sup); }catch(e){}
-        srPrintPermit(r, srPermitPersons(r), from, to, sup, r.company, srDefaultStamp(), rule.title);
-      });
       if(printBtn) printBtn.addEventListener('click', ()=>{ ctx.closeOverlay(); printApproved(r, def, label, payload, labels, r.notes); });
       async function updateStatus(newStatus){
         const note = (overlayEl.querySelector('#sr-note')||{}).value || '';

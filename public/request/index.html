@@ -531,6 +531,8 @@ const SR_FORM_DEFS = {
       { titleAr:'بيانات إضافية', fields:[
         { key:'contractNumber', type:'text', labelAr:'رقم العقد' },
         { key:'unifiedNumber', type:'text', labelAr:'الرقم الموحد' },
+        { key:'vehicleType', type:'text', labelAr:'نوع المركبة (لتصريح المركبة)' },
+        { key:'plateNumber', type:'text', labelAr:'رقم اللوحة (لتصريح المركبة)' },
       ]},
       { titleAr:'بيانات صاحب البطاقة / التصريح', fields:[
         { key:'holderName', type:'text', labelAr:'الاسم' },
@@ -543,6 +545,7 @@ const SR_FORM_DEFS = {
         { key:'lossCount', type:'select', labelAr:'الفقدان للمرة', options:['الأولى','الثانية','الثالثة فأكثر'] },
         { key:'lossDate', type:'date', labelAr:'تاريخ الفقدان' },
         { key:'employerReportDate', type:'date', labelAr:'تاريخ إبلاغ جهة العمل' },
+        { key:'securityReportDate', type:'date', labelAr:'تاريخ إبلاغ إدارة الأمن والسلامة (إن وجد)' },
         { key:'expiryDate', type:'date', labelAr:'تاريخ انتهاء صلاحية البطاقة / التصريح' },
       ]},
     ],
@@ -625,7 +628,10 @@ th.big{ background:#8040ff; color:#fff }
 .sg img{ max-width:150px; max-height:110px }
 .pg{ width:100%; display:block; margin:0 0 10px; border:1px solid #ccc }
 .note{ font-size:12px; margin-top:10px; color:#333 }
-@media print{ .bar{ display:none } .doc{ padding:0; max-width:none } .pg{ border:0; margin:0; page-break-after:always } @page{ size:A4; margin:8mm }
+.lc td{ height:26px; text-align:center } .lc td.p{ background:#8040ff; color:#fff; font-weight:700; width:15% } .lc td.s{ font-weight:700; width:15% }
+.tag{ display:inline-block; background:#8040ff; color:#fff; font-weight:700; padding:6px 22px; margin:12px 0 0 }
+.decl{ font-size:13px; line-height:2; margin:10px 0 }
+@media print{ .lc td{ height:20px } .decl{ line-height:1.7; font-size:12px; margin:6px 0 } .bar{ display:none } .doc{ padding:0; max-width:none } .pg{ border:0; margin:0; page-break-after:always } @page{ size:A4; margin:8mm }
   .hd{ margin-bottom:8px } .hd img{ width:34% } h1{ margin:4px 0 2px; font-size:18px } table{ font-size:12px } td,th{ padding:2px 6px }
   .vt td{ height:19px; padding:1px 6px } .ttl{ font-size:18px; padding:6px 20px } .two{ margin-bottom:8px } .rules{ font-size:11.5px; line-height:1.5 }
   .sg,.note,.stampbox,.rules,.vt{ page-break-inside:avoid } .sg{ margin-top:8px } .sg img{ max-height:70px } .stampbox img{ width:120px } }
@@ -713,6 +719,36 @@ function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, titl
     '<p class="note">ملاحظة : يجب وضع ختم المنشأة الأصل بجانب ختم الهيئة الملكية قبل تسليمها للمصرح له.</p>' +
     '<p class="note"><b>علماً بأن المذكور أعلاه يعمل لدى : ' + srEsc(company||'') + '</b></p>';
   return srOpenPrintDoc(title||'تصريح دخول أفراد', body);
+}
+
+// "بلاغ فقدان" — same layout as the official form. opts.stampSrc prints the stamp (admin approved copy only).
+function srPrintLoss(d, opts){
+  opts = opts || {}; d = d || {};
+  const isVeh = d.lostItemType === 'تصريح مركبة';
+  const cardNo = isVeh ? '' : (d.lostItemNumber||'');
+  const vehNo = isVeh ? (d.lostItemNumber||'') : '';
+  const kv = (k,v)=> '<tr><td class="s" style="width:38%">' + k + '</td><td>' + srEsc(v||'') + '</td></tr>';
+  const meta = []; if(opts.requestId) meta.push('رقم الطلب: ' + srEsc(opts.requestId)); meta.push(srToday()); if(opts.statusLine) meta.push(srEsc(opts.statusLine));
+  const body = srWatermark() +
+    '<div class="hd"><img src="' + srAbs('../brand/logo-header.png') + '" alt=""><div class="ttl">بلاغ فقدان</div></div>' +
+    '<table class="lc">' +
+      '<tr><td class="p">رقم البطاقة</td><td>' + srEsc(cardNo) + '</td><td class="s">رقم العقد</td><td>' + srEsc(d.contractNumber||'') + '</td><td class="s">الرقم الموحد</td><td>' + srEsc(d.unifiedNumber||'') + '</td></tr>' +
+      '<tr><td class="p">رقم تصريح المركبة</td><td>' + srEsc(vehNo) + '</td><td class="s">نوع المركبة</td><td>' + srEsc(d.vehicleType||'') + '</td><td class="s">رقم اللوحة</td><td>' + srEsc(d.plateNumber||'') + '</td></tr></table>' +
+    '<table class="lc" style="margin-top:-1px">' +
+      kv('منطقة الدخول','مدينة رأس الخير للصناعات التعدينية') + kv('الجهة / الإدارة', d.entityDept) + kv('اسم فاقد البطاقة / التصريح', d.holderName) +
+      kv('الجنسية', d.nationality) + kv('رقم الهوية الوطنية / مقيم', d.idNumber) + kv('الفقدان للمرة', d.lossCount) + kv('تاريخ الفقدان', d.lossDate) +
+      kv('تاريخ إبلاغ جهة العمل', d.employerReportDate) + kv('تاريخ إبلاغ إدارة الأمن والسلامة', d.securityReportDate) +
+      kv('تاريخ انتهاء صلاحية البطاقة / التصريح', d.expiryDate) + kv('رقم الجوال', d.phone) + '</table>' +
+    '<p class="decl">أقر أنا الموقع أدناه بفقدان البطاقة / التصريح الموضح رقمه أعلاه الصادر من إدارة الأمن والسلامة بالهيئة الملكية برأس الخير وأتعهد بمراجعة الشرطة وإبلاغهم عن البطاقة المفقودة حالًا. كما أتعهد بالحضور إلى وحدة التحقيق بإدارة الأمن والسلامة خلال مدة لا تتجاوز يومين من تاريخه لإنهاء إجراءات التحقيق.</p>' +
+    '<table class="lc"><tr><th colspan="4" class="big">المقر بما فيه</th></tr>' +
+      '<tr><td class="s">الاسم</td><td>' + srEsc(d.holderName||'') + '</td><td class="s">الرقم الوظيفي</td><td></td></tr>' +
+      '<tr><td class="s">الوظيفة</td><td></td><td class="s">التوقيع</td><td></td></tr></table>' +
+    '<div class="tag">للاستعمال الرسمي</div>' +
+    '<table class="lc"><tr><td class="s">تم إلغاء البطاقة</td><td style="width:6%"></td><td class="s" style="width:9%">مدان</td><td style="width:6%"></td><td class="s" style="width:12%">غير مدان</td><td style="width:6%"></td><td class="s">مبلغ الفقدان</td><td></td></tr>' +
+      '<tr><td class="s">الموظف المختص</td><td colspan="3"></td><td class="s">التوقيع</td><td></td><td class="s">التاريخ</td><td></td></tr></table>' +
+    (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt=""></div>' : '') +
+    '<p class="note"><b>مبلغ الفقدان: 500 ريال لكل بطاقة عمل وتصريح مركبة.</b></p><div class="note">' + meta.join(' — ') + '</div>';
+  return srOpenPrintDoc('بلاغ فقدان', body);
 }
 
 // GRRK — Public request page for representatives/employees (no admin data).
@@ -1098,6 +1134,7 @@ function startApp(){
   }
   function printForm(def, data, reqId){
     if(def === SR_FORM_DEFS.visit_request){ srPrintVisitForm(data, { requestId:reqId }); return; }
+    if(def === SR_FORM_DEFS.loss_report){ srPrintLoss(data, { requestId:reqId }); return; }
     if(def === SR_FORM_DEFS.entry_permit){
       srPrintPermit({ id: reqId || '' }, (data.visitors||[]).map(v=>({ name:v.name, nat:v.nationality, id:v.idNumber, en:v.englishName })), data.permitFrom||'', data.permitTo||'', '', data.employerName||'', '', 'تصريح دخول أفراد', { draft:true });
       return;
@@ -1110,7 +1147,7 @@ function startApp(){
     for(const st of def.steps){
       const optStep = /إن وجد|إضافية/.test(st.titleAr);
       if(optStep) continue;
-      const miss = st.fields.find(f=> f.type!=='visitorsTable' && !/contract|previous|unified/i.test(f.key) && !String(wizardData[f.key]||'').trim());
+      const miss = st.fields.find(f=> f.type!=='visitorsTable' && !/contract|previous|unified|vehicleType|plateNumber|securityReportDate/i.test(f.key) && !String(wizardData[f.key]||'').trim());
       if(miss) return 'عبّئ: ' + miss.labelAr;
     }
     if(def.steps.some(st=>st.fields.some(f=>f.type==='visitorsTable'))){

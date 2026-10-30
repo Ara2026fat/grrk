@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T09:17:29Z', dmy: '30/10/2026', hm: '12:17' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T09:57:13Z', dmy: '30/10/2026', hm: '12:57' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -6162,8 +6162,7 @@ function renderServiceRequests(root, ctx){
       <div class="sr-loading" id="sr-inbox-loading">${isAr?'جار التحميل...':'Loading...'}</div>
     `;
     try{
-      if(!cfg.adminToken){ root.querySelector('#sr-inbox-loading').innerHTML = (isAr?'أدخل مفتاح الأدمن أولًا من الإعدادات':'Enter the admin key in settings first') + '<br><button class="btn primary" id="sr-inbox-cfg" style="margin-top:12px">'+(isAr?'الإعدادات':'Settings')+'</button>'; root.querySelector('#sr-inbox-cfg').addEventListener('click', ()=>{ view='config'; paint(); }); return; }
-      const res = await srApiGet(cfg.url, { token:cfg.token, admin_token:cfg.adminToken, action:'list' });
+      const res = await srApiGet(cfg.url, { token:cfg.token, admin_token:cfg.adminToken||'', action:'list' });
       if(!res.ok){ root.querySelector('#sr-inbox-loading').textContent = res.error==='admin_only' ? (isAr?'مفتاح الأدمن غير صحيح':'Wrong admin key') : (isAr?'تعذر التحميل':'Failed to load'); return; }
       const items = (res.requests||[]).sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
       if(items.length === 0){

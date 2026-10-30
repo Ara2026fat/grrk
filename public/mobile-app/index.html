@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T17:47:49Z', dmy: '30/10/2026', hm: '20:47' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-10-30T18:57:53Z', dmy: '30/10/2026', hm: '21:57' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5561,6 +5561,13 @@ th.big{ background:#8040ff; color:#fff }
 .note{ font-size:12px; margin-top:10px; color:#333 }
 .lc td{ height:26px; text-align:center } .lc td.p{ background:#8040ff; color:#fff; font-weight:700; width:15% } .lc td.s{ font-weight:700; width:15% }
 .tag{ display:inline-block; background:#8040ff; color:#fff; font-weight:700; padding:6px 22px; margin:12px 0 0 }
+.bc td{ padding:3px 6px; font-size:12px; line-height:1.5 } .bc td.p{ background:#e9e2ff; font-weight:700; text-align:center } .bc td.s{ font-weight:700 } .bc td.en{ direction:ltr; width:24%; font-size:11px; color:#333 }
+.cbx{ display:inline-block; margin:0 8px 2px 0; white-space:nowrap } .cbr{ display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:3px }
+.bx{ border:1px solid #333; padding:6px 10px; margin-top:6px; font-size:12px; line-height:1.6 } .bx.off{ background:#e6f1fb }
+.sgl{ display:flex; justify-content:space-between; gap:6px; margin-top:6px; overflow:hidden; white-space:nowrap } .decl2{ font-size:11.5px }
+.bpage .lh img{ width:46%; max-width:300px } .bpage .wm{ display:none }
+@media print{ .bpage .lh{ margin-bottom:2px } .bpage .bc td{ padding:1px 5px; font-size:11px; line-height:1.35 } .bpage .bx{ padding:3px 8px; margin-top:4px; font-size:11px; line-height:1.45 } .bpage .decl2{ font-size:10.5px } .bpage .sgl{ margin-top:3px } .bpage h1{ font-size:17px } .bpage .sub{ margin-bottom:3px!important } .bpage .stampbox{ margin-top:2px } .bpage .stampbox img{ width:80px!important } }
+.ins{ font-size:15px; line-height:2.1; padding-inline-start:22px }
 .decl{ font-size:13px; line-height:2; margin:10px 0 }
 @media print{ .lc td{ height:20px } .decl{ line-height:1.7; font-size:12px; margin:6px 0 } .bar{ display:none } .doc{ padding:0; max-width:none } .pg{ border:0; margin:0; page-break-after:always } @page{ size:A4; margin:8mm }
   .hd{ margin-bottom:8px } .hd img{ width:34% } h1{ margin:4px 0 2px; font-size:18px } table{ font-size:12px } td,th{ padding:2px 6px }
@@ -5680,6 +5687,53 @@ function srPrintLoss(d, opts){
     (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt=""></div>' : '') +
     '<p class="note"><b>مبلغ الفقدان: 500 ريال لكل بطاقة عمل وتصريح مركبة.</b></p><div class="note">' + meta.join(' — ') + '</div>';
   return srOpenPrintDoc('بلاغ فقدان', body);
+}
+
+// "طلب إصدار بطاقة" — follows the official form (page 1 = form, page 2 = instructions).
+function srPrintBadge(d, opts){
+  opts = opts || {}; d = d || {};
+  const cb = (on, label)=> '<span class="cbx">' + (on ? '&#9745;' : '&#9744;') + ' ' + label + '</span>';
+  const eq = (k, v)=> d[k] === v;
+  const row = (ar, v, en)=> '<tr><td class="s" style="width:24%">' + ar + '</td><td>' + srEsc(v||'') + '</td><td class="en">' + en + '</td></tr>';
+  const sig = (who)=> '<div class="sgl"><span>' + who + ': ' + '.'.repeat(34) + '</span><span>التوقيع: ' + '.'.repeat(22) + '</span><span>التاريخ: &nbsp;&nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;١٤ هـ</span></div>';
+  const meta = []; if(opts.requestId) meta.push('رقم الطلب: ' + srEsc(opts.requestId)); meta.push(srToday()); if(opts.statusLine) meta.push(srEsc(opts.statusLine));
+  const page1 = '<div class="bpage">' + srWatermark() + srLetterhead() +
+    '<h1 style="margin:2px 0">طلب إصدار بطاقة</h1><div class="sub" style="color:#d00000;font-weight:700;font-size:14px;margin-bottom:6px">يعبأ الطلب طباعة</div>' +
+    '<table class="bc"><tr><td class="p" style="width:13%">مقدم الطلب</td><td>' +
+      '<div class="cbr">' + cb(eq('entityType','مدينة رأس الخير للصناعات التعدينية'),'مدينة رأس الخير للصناعات التعدينية') + cb(eq('entityType','جهة حكومية'),'جهة حكومية') + cb(eq('entityType','شركة / مؤسسة'),'شركة / مؤسسة') + '</div>' +
+      '<div><b>اسم الإدارة / الجهة:</b> ' + srEsc(d.entityName||'') + '</div><div><b>رقم الإدارة:</b> ' + srEsc(d.departmentNumber||'') + '</div></td>' +
+      '<td class="p" style="width:9%">الموظف</td><td>' + cb(eq('employeeType','رسمي'),'رسمي') + '<br>' + cb(eq('employeeType','مؤقت'),'مؤقت') + '<br>' + cb(eq('employeeType','متدرب'),'متدرب') + '</td>' +
+      '<td class="p" style="width:9%">البطاقة</td><td>' + cb(eq('requestType','إصدار'),'إصدار') + ' ' + cb(eq('requestType','تجديد'),'تجديد') + '<br>' + cb(eq('requestType','استبدال'),'استبدال') + '<br>' + cb(eq('requestType','بدل تالف / فاقد'),'بدل تالف / فاقد') + '</td></tr></table>' +
+    '<table class="bc" style="margin-top:4px">' +
+      row('الاسم', d.fullName, 'Name').replace('<tr>','<tr><td class="p" rowspan="12" style="width:5%;writing-mode:vertical-rl">المعلومات الشخصية</td>') + row('الرقم الوظيفي', d.employeeNumber, 'Employee No.') + row('فصيلة الدم', d.bloodType, 'Blood Group') + row('مسمى الوظيفة', d.jobTitle, 'Job Title') +
+      row('تاريخ الميلاد', d.dob, 'Date Of Birth') + row('الجنسية', d.nationality, 'Nationality') + row('رقم البطاقة المدنية / الإقامة', d.idNumber, 'Nationality Booklet / Iqama No.') +
+      row('مكان الإصدار', d.issuePlace, 'Place Of Issue') + row('تاريخ الإصدار', d.issueDate, 'Date Of Issue') + row('تاريخ الإنتهاء', d.expiryDate, 'Date Of Exp.') +
+      row('رقم العقد', d.contractNumber, 'Contract No.') + row('تاريخ إنتهاء العقد', d.contractExpiry, 'No. of Contract Completion') + '</table>' +
+    '<div class="bx"><b>المكرم مدير إدارة الأمن الصناعي والسلامة:</b><div class="decl2">نتقدم بطلب البطاقة الموضحة أدناه لمتطلبات العمل ونتعهد بموجب توقيعنا أدناه بالعمل على إعادة البطاقة فور إنتهاء العمل الذي أصدرت من أجله أو إنتهاء صلاحيتها (أيهما ينتهي أولًا) والإبلاغ عن فقدانها والالتزام بالتعليمات الصادرة من وزارة الداخلية بهذا الخصوص بالقرار رقم ٢١٣٩ وتاريخ ٨/٤/١٤٠٣هـ، والموضحة في خلف النموذج.</div>' +
+      '<div class="cbr" style="margin-top:6px">' + cb(eq('cardType','بطاقة رجل أمن'),'بطاقة رجل أمن') + cb(eq('cardType','بطاقة موظفي مدينة رأس الخير'),'بطاقة موظفي مدينة رأس الخير للصناعات التعدينية') + cb(eq('cardType','بطاقة الشركات'),'بطاقة الشركات') + '</div></div>' +
+    '<div class="bx"><b>مدير الجهة المتقدمة بالطلب المسؤول عن صحة جميع المعلومات أعلاه:</b>' + sig('الاسم') + '</div>' +
+    '<div class="bx"><b>تحت مسئوليتي الكاملة أؤيد طلب المذكور للبطاقة الموضحة أعلاه</b><div style="margin:4px 0">اسم الإدارة المشرفة على المقاول: ' + '.'.repeat(70) + '</div>' + sig('مدير الإدارة') + '</div>' +
+    '<div class="bx off"><div class="cbr"><b>للاستخدام الرسمي</b>' + cb(false,'البطاقة القديمة لا تزال بعهدته') + cb(false,'تم استعادة البطاقة القديمة') + '</div>' +
+      '<div>البصمات ' + cb(false,'تم رفع البصمات برقم') + ' ' + '.'.repeat(20) + ' &nbsp; الاسم: ' + '.'.repeat(16) + ' التوقيع: ' + '.'.repeat(12) + '</div>' +
+      '<div>البطاقات: صرف له بطاقة رقم: ' + '.'.repeat(16) + ' تاريخ الإصدار: &nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;١٤ هـ &nbsp; تاريخ الانتهاء: &nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;١٤ هـ</div>' +
+      '<div class="cbr"><span>إدخلت المعلومات بواسطة — الاسم: ' + '.'.repeat(14) + ' التوقيع: ' + '.'.repeat(10) + '</span><span>مسؤول الإصدار — الاسم: ' + '.'.repeat(14) + ' التوقيع: ' + '.'.repeat(10) + '</span></div>' +
+      (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt="" style="width:110px"></div>' : '') + '</div>' +
+    '<div class="bx">أقر بأنني إستلمت البطاقة الموضحة بياناتها أعلاه، وأتعهد بعدم تصوير البطاقة صودرة ملونة واستخدامها للدخول بدلًا من الأصل مهما كانت الأسباب والمبررات.' + sig('الاسم') + '</div>' +
+    '<div class="note" style="color:#d00000"><b>ملاحظة: تعليمات هامة بالخلف يجب التقيد بها</b> — ' + meta.join(' — ') + '</div></div>';
+  const li = t=> '<li>' + t + '</li>';
+  const page2 = '<div style="page-break-before:always"><h1 style="margin:20px 0">تعليمات هامة يجب التقيد بها</h1><ul class="ins">' + [
+    'تحدد البطاقة المطلوبة بالنسبة لموظفي مدينة رأس الخير للصناعات التعدينية من قبل مدير إدارة الموظف، أما بالنسبة للعاملين لدى الشركات أو المؤسسات فتحدد البطاقة من قبل مدير الشركة أو المؤسسة التي يعمل بها الموظف ويتطلب موافقة مدير الإدارة المشرفة على العقد.',
+    'يجب المحافظة على البطاقة وعدم اعارتها أو رهنها لدى أي جهة كانت والإبلاغ الفوري عن فقدانها.',
+    'يجب عدم إبرازها للفنادق والشقق المفروشة وشركات التقسيط والتأجير وغيرها وعدم السماح لهم بأخذ صورة منها.',
+    'يجب استعادة البطاقة عند إعارة الموظف السعودي للعمل لدى جهة أخرى غير مدينة رأس الخير للصناعات التعدينية، كذلك يجب إستعادتها عند أستلام الموظف غير السعودي لجواز سفره لأي غرض من الأغراض.',
+    'يجب على موظف مدينة رأس الخير للصناعات التعدينية البدء بإجراءات تجديد البطاقة في الأسبوع السابق لتاريخ انتهائها.',
+    'يجب على الشركات والمؤسسات إعادة بطاقات موظفيهم في اليوم التالي لإنتهاء صلاحيتها أو إنتهاء العمل الذي صدرت من أجله (أيهما أولًا) وفي حالة عدم إلتزامهم بذلك يلزمون بدفع مبلغ (١٠٠) ريال عن كل بطاقة وعن كل أسبوع يمضي بعد إنتهائها وبحد اقصى هو أربعة اسابيع من تاريخ انتهاء البطاقة وبعدها لإدارة الأمن الصناعي والسلامة الحق في إتخاذ التدابير اللازمة.',
+    'إن عدم تجديد البطاقة في حينه يترتب عليه منع الموظف من دخول المنشأة ولا تتحمل إدارة الأمن الصناعي والسلامة مسؤولية ذلك.',
+    'يجب عدم استخدام البطاقة لغير الغرض الذي صدرت من أجله.',
+    'إن فقدان البطاقة يترتب عليه غرامة مالية في حالة ثبوت الإهمال أو التقصير.',
+    'يجب الإلتزام بعدم تصوير البطاقة صورة ملونة واستخدامها للدخول بدلًا من الأصل مهما كانت الأسباب والمبررات.'
+  ].map(li).join('') + '</ul></div>';
+  return srOpenPrintDoc('طلب إصدار بطاقة', page1 + page2);
 }
 
 // MODULE: Service Requests (طلبات الخدمات الحكومية)
@@ -6360,6 +6414,7 @@ function renderServiceRequests(root, ctx){
   function printForm(def, data, reqId){
     if(def === SR_FORM_DEFS.visit_request){ srPrintVisitForm(data, { requestId:reqId }); return; }
     if(def === SR_FORM_DEFS.loss_report){ srPrintLoss(data, { requestId:reqId }); return; }
+    if(def === SR_FORM_DEFS.badge){ srPrintBadge(data, { requestId:reqId }); return; }
     if(def === SR_FORM_DEFS.entry_permit){
       srPrintPermit({ id: reqId || '' }, (data.visitors||[]).map(v=>({ name:v.name, nat:v.nationality, id:v.idNumber, en:v.englishName })), data.permitFrom||'', data.permitTo||'', '', data.employerName||'', '', 'تصريح دخول أفراد', { draft:true });
       return;
@@ -6539,6 +6594,10 @@ function renderServiceRequests(root, ctx){
     if(r.form_type === 'entry_permit'){
       const persons = (payload.visitors||[]).map(v=>({ name:v.name, nat:v.nationality, id:v.idNumber, en:v.englishName }));
       srPrintPermit(r, persons, payload.permitFrom, payload.permitTo, srSupervisor(), payload.employerName || r.company, stamp, 'تصريح دخول أفراد', { number: srPermitNumber(r) });
+      return;
+    }
+    if(r.form_type === 'badge'){
+      srPrintBadge(payload, { requestId:r.id, statusLine:'معتمد' + (note?(' — '+note):''), stampSrc:stamp });
       return;
     }
     if(r.form_type === 'loss_report'){

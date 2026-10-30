@@ -588,7 +588,8 @@ function startApp(){
   const cfg = SR_CFG;
 
   let session = srLoadSession();
-  let view = session ? 'formtype' : 'identify';   // identify | register | formtype | wizard | done
+  let view = 'formtype';
+  let pendingForm = null;   // identify | register | formtype | wizard | done
   let wizardForm = null;
   let wizardStep = 0;
   let wizardData = {};
@@ -596,8 +597,21 @@ function startApp(){
 
   const CITY = 'مدينة رأس الخير للصناعات التعدينية';
   const backBtn = document.getElementById('backBtn');
+  function startWizard(key){
+    wizardForm = key; wizardStep = 0; wizardData = {};
+    if(SR_FORM_DEFS[key].steps.some(st=>st.fields.some(f=>f.key==='entityType'))){
+      wizardData.entityType = session && session.type==='employee' ? CITY : 'شركة / مؤسسة';
+    }
+    view = 'wizard';
+  }
+  function afterIdentify(){
+    if(pendingForm){ const k = pendingForm; pendingForm = null; startWizard(k); }
+    else view = 'formtype';
+    paint();
+  }
   function goBack(){
-    if(view === 'register' || view === 'employee'){ view='identify'; }
+    if(view === 'identify'){ pendingForm=null; view='formtype'; }
+    else if(view === 'register' || view === 'employee'){ view='identify'; }
     else if(view === 'wizard'){
       const st = SR_FORM_DEFS[wizardForm].steps[wizardStep];
       st.fields.forEach(f=>{ if(f.type==='visitorsTable') return; const el = root.querySelector('#sr-f-'+f.key); if(el) wizardData[f.key] = el.value; });
@@ -609,7 +623,7 @@ function startApp(){
   }
   if(backBtn) backBtn.addEventListener('click', goBack);
   function paint(){
-    if(backBtn) backBtn.hidden = (view === 'identify' || view === 'formtype');
+    if(backBtn) backBtn.hidden = (view === 'formtype');
     window.scrollTo(0,0);
     if(view === 'identify') return paintIdentify();
     if(view === 'register') return paintRegister();
@@ -641,14 +655,14 @@ function startApp(){
       if(!name || !no || !phone){ showToast('الاسم والرقم الوظيفي والجوال مطلوبة'); return; }
       session = { type:'employee', name, company:CITY, employee_no:no, phone, email };
       srSaveSession(session);
-      view = 'formtype'; paint();
+      afterIdentify();
     });
   }
 
   function paintIdentify(){
     root.innerHTML = `
       <div class="glass" style="margin-bottom:16px">
-        <div class="eyebrow">تقديم طلب</div>
+        <div class="eyebrow">${pendingForm ? esc(SR_FORM_DEFS[pendingForm].labelAr) : 'تقديم طلب'}</div>
         <p class="muted" style="margin-top:8px">من أنت؟</p>
         <button class="btn primary block" id="sr-id-emp" style="margin-top:14px">أنا موظف في مدينة رأس الخير</button>
         <p class="muted" style="margin:16px 0 0">مندوب شركة؟ سجّل مرة واحدة وتحصل على رقمك الخاص.</p>
@@ -672,7 +686,7 @@ function startApp(){
         if(res.ok){
           session = { rep_id:res.rep.rep_id, name:res.rep.name, company:res.rep.company };
           srSaveSession(session);
-          view = 'formtype'; paint();
+          afterIdentify();
         }else{
           showToast('رقم التسجيل غير موجود');
           btn.disabled = false; btn.textContent = 'دخول';
@@ -724,7 +738,7 @@ function startApp(){
               <button class="btn primary block" id="sr-r-continue">متابعة لتقديم الطلب</button>
             </div>
           `;
-          root.querySelector('#sr-r-continue').addEventListener('click', ()=>{ view='formtype'; paint(); });
+          root.querySelector('#sr-r-continue').addEventListener('click', afterIdentify);
         }else{
           showToast('تعذر التسجيل');
           btn.disabled = false; btn.textContent = 'تسجيل';
@@ -738,13 +752,13 @@ function startApp(){
 
   function paintFormType(){
     root.innerHTML = `
-      <div class="glass sr-rep-chip">
+      ${session ? `<div class="glass sr-rep-chip">
         <span class="icon3d sm" style="--i1:var(--glow);--i2:var(--gold2)">${SR_ICONS.employees}</span>
         <span class="sr-rep-text">
           <span class="sr-rep-name">${esc(session.name||'')}</span>
           <span class="sr-rep-sub">${esc(session.type==='employee' ? ('الرقم الوظيفي '+session.employee_no) : session.rep_id)} ${session.company?('· '+esc(session.company)):''}</span>
         </span>
-      </div>
+      </div>` : `<div class="glass" style="margin-bottom:14px"><div class="eyebrow">اختر نوع الطلب</div></div>`}
       <div class="sr-formtype-grid">
         ${Object.keys(SR_FORM_DEFS).map(key=>{
           const f = SR_FORM_DEFS[key];
@@ -756,23 +770,18 @@ function startApp(){
           `;
         }).join('')}
       </div>
-      <button class="btn ghost block" id="sr-ft-switch" style="margin-top:16px">لست أنا — تبديل الحساب</button>
+      ${session ? `<button class="btn ghost block" id="sr-ft-switch" style="margin-top:16px">لست أنا — تبديل الحساب</button>` : ''}
     `;
     root.querySelectorAll('[data-form]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        wizardForm = btn.getAttribute('data-form');
-        wizardStep = 0;
-        wizardData = {};
-        if(SR_FORM_DEFS[wizardForm].steps.some(st=>st.fields.some(f=>f.key==='entityType'))){
-          wizardData.entityType = session.type==='employee' ? CITY : 'شركة / مؤسسة';
-        }
-        view = 'wizard';
+        const key = btn.getAttribute('data-form');
+        if(!session){ pendingForm = key; view = 'identify'; }
+        else startWizard(key);
         paint();
       });
     });
-    root.querySelector('#sr-ft-switch').addEventListener('click', ()=>{
-      srClearSession(); session = null; view = 'identify'; paint();
-    });
+    const sw = root.querySelector('#sr-ft-switch');
+    if(sw) sw.addEventListener('click', ()=>{ srClearSession(); session = null; view = 'formtype'; paint(); });
   }
 
   function renderFieldInput(f){

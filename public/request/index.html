@@ -650,12 +650,13 @@ function srLetterhead(){ return '<div class="lh"><img src="' + srAbs('../brand/l
 function srWatermark(){ return '<img class="wm" src="' + srAbs('../brand/symbol-watermark.jpg') + '" alt="">'; }
 function srToday(){ return new Date().toLocaleDateString('ar-SA-u-ca-gregory'); }
 
-function srOpenPrintDoc(title, bodyHtml){
-  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + srEsc(title) + '</title><style>' + SR_PRINT_CSS + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button> <button onclick="srBack()" style="margin-inline-start:10px;background:#dbe4ff">↩ رجوع للتطبيق</button></div><script>function srBack(){ try{ window.close(); }catch(e){} setTimeout(function(){ if(window.opener){ try{ window.opener.focus(); }catch(e){} } else { history.back(); } },150); }<\/script><div class="doc">' + bodyHtml + '</div></body></html>';
+function srFitOverlays(root){ if(window.CSS && CSS.supports && CSS.supports('width','1cqw')) return; (root||document).querySelectorAll('.op').forEach(function(o){ var i=o.querySelector('.oi'); if(i) i.style.fontSize = (o.clientWidth/100) + 'px'; }); }
+function srOpenPrintDoc(title, bodyHtml, extraCss){
+  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + srEsc(title) + '</title><style>' + SR_PRINT_CSS + (extraCss||'') + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button> <button onclick="srBack()" style="margin-inline-start:10px;background:#dbe4ff">↩ رجوع للتطبيق</button></div><script>function srBack(){ try{ window.close(); }catch(e){} setTimeout(function(){ if(window.opener){ try{ window.opener.focus(); }catch(e){} } else { history.back(); } },150); }function srFit(){ if(window.CSS&&CSS.supports&&CSS.supports("width","1cqw")) return; document.querySelectorAll(".op").forEach(function(o){ var i=o.querySelector(".oi"); if(i) i.style.fontSize=(o.clientWidth/100)+"px"; }); } window.addEventListener("load",srFit); window.addEventListener("resize",srFit); window.addEventListener("beforeprint",srFit); window.addEventListener("afterprint",srFit);<\/script><div class="doc">' + bodyHtml + '</div></body></html>';
   const w = window.open('', '_blank');
   if(w){ w.document.open(); w.document.write(html); w.document.close(); return true; }
   const old = document.getElementById('sr-print'); if(old) old.remove();
-  const el = document.createElement('div'); el.id = 'sr-print'; el.innerHTML = bodyHtml; document.body.appendChild(el);
+  const el = document.createElement('div'); el.id = 'sr-print'; el.innerHTML = bodyHtml; document.body.appendChild(el); srFitOverlays(el);
   window.addEventListener('afterprint', ()=>{ const e = document.getElementById('sr-print'); if(e) e.remove(); }, { once:true });
   window.print();
   return true;
@@ -727,81 +728,62 @@ function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, titl
   return srOpenPrintDoc(title||'تصريح دخول أفراد', body);
 }
 
-// "بلاغ فقدان" — same layout as the official form. opts.stampSrc prints the stamp (admin approved copy only).
+// ===== Exact official forms: the original form is the background, data is written on top of it =====
+const SR_OVERLAY_CSS = '@page{ size:A4; margin:0 } @media print{ .doc{ padding:0!important } } .op{ position:relative; margin:0 auto; line-height:1; container-type:inline-size } .op .oi{ position:absolute; left:0; top:0; width:100%; height:100%; font-size:1cqw } .op img.bg{ width:100%; display:block } .op .t{ position:absolute; white-space:nowrap; font-weight:700; color:#0b1f4d; font-family:Tahoma,Arial,sans-serif; unicode-bidi:plaintext } .op .k{ position:absolute; font-weight:900; color:#0b1f4d; line-height:1 } .op .st{ position:absolute; height:auto } .opb{ page-break-after:always }';
+// items: ['t', x, y, text, anchor('r'|'c'|'l'), sizeInPercentOfWidth]  |  ['k', x, y]  (tick)  |  ['s', x, y, widthPx, src] (stamp)
+function srOverlayPage(bg, W, H, items, widthPct){
+  const pc = (v,t)=> (v/t*100).toFixed(3) + '%';
+  let h = '<div class="op" style="width:' + (widthPct||100) + '%;aspect-ratio:' + W + '/' + H + '"><img class="bg" src="' + bg + '" alt=""><div class="oi">';
+  items.forEach(function(it){
+    if(it[0] === 't'){
+      if(!it[3]) return;
+      const a = it[4] || 'r', sz = it[5] || 1.8;
+      const pos = a==='r' ? 'right:' + pc(W-it[1],W) + ';text-align:right' : a==='l' ? 'left:' + pc(it[1],W) : 'left:' + pc(it[1],W) + ';transform:translate(-50%,-50%)';
+      h += '<span class="t" style="' + pos + ';top:' + pc(it[2],H) + ';font-size:' + sz + 'em;' + (a==='c' ? '' : 'transform:translateY(-50%);') + '">' + srEsc(it[3]) + '</span>';
+    } else if(it[0] === 'k'){
+      h += '<span class="k" style="left:' + pc(it[1],W) + ';top:' + pc(it[2],H) + ';font-size:2.5em;transform:translate(-50%,-50%)">&#10004;</span>';
+    } else if(it[0] === 's' && it[4]){
+      h += '<img class="st" src="' + it[4] + '" style="left:' + pc(it[1]-it[3]/2,W) + ';top:' + pc(it[2],H) + ';width:' + pc(it[3],W) + '" alt="">';
+    }
+  });
+  return h + '</div></div>';
+}
+
+// "بلاغ فقدان" — original form (1241x1754 background).
 function srPrintLoss(d, opts){
   opts = opts || {}; d = d || {};
   const isVeh = d.lostItemType === 'تصريح مركبة';
-  const cardNo = isVeh ? '' : (d.lostItemNumber||'');
-  const vehNo = isVeh ? (d.lostItemNumber||'') : '';
-  const kv = (k,v)=> '<tr><td class="s" style="width:38%">' + k + '</td><td>' + srEsc(v||'') + '</td></tr>';
-  const meta = []; if(opts.requestId) meta.push('رقم الطلب: ' + srEsc(opts.requestId)); meta.push(srToday()); if(opts.statusLine) meta.push(srEsc(opts.statusLine));
-  const body = srWatermark() +
-    '<div class="hd"><img src="' + srAbs('../brand/logo-header.png') + '" alt=""><div class="ttl">بلاغ فقدان</div></div>' +
-    '<table class="lc">' +
-      '<tr><td class="p">رقم البطاقة</td><td>' + srEsc(cardNo) + '</td><td class="s">رقم العقد</td><td>' + srEsc(d.contractNumber||'') + '</td><td class="s">الرقم الموحد</td><td>' + srEsc(d.unifiedNumber||'') + '</td></tr>' +
-      '<tr><td class="p">رقم تصريح المركبة</td><td>' + srEsc(vehNo) + '</td><td class="s">نوع المركبة</td><td>' + srEsc(d.vehicleType||'') + '</td><td class="s">رقم اللوحة</td><td>' + srEsc(d.plateNumber||'') + '</td></tr></table>' +
-    '<table class="lc" style="margin-top:-1px">' +
-      kv('منطقة الدخول','مدينة رأس الخير للصناعات التعدينية') + kv('الجهة / الإدارة', d.entityDept) + kv('اسم فاقد البطاقة / التصريح', d.holderName) +
-      kv('الجنسية', d.nationality) + kv('رقم الهوية الوطنية / مقيم', d.idNumber) + kv('الفقدان للمرة', d.lossCount) + kv('تاريخ الفقدان', d.lossDate) +
-      kv('تاريخ إبلاغ جهة العمل', d.employerReportDate) + kv('تاريخ إبلاغ إدارة الأمن والسلامة', d.securityReportDate) +
-      kv('تاريخ انتهاء صلاحية البطاقة / التصريح', d.expiryDate) + kv('رقم الجوال', d.phone) + '</table>' +
-    '<p class="decl">أقر أنا الموقع أدناه بفقدان البطاقة / التصريح الموضح رقمه أعلاه الصادر من إدارة الأمن والسلامة بالهيئة الملكية برأس الخير وأتعهد بمراجعة الشرطة وإبلاغهم عن البطاقة المفقودة حالًا. كما أتعهد بالحضور إلى وحدة التحقيق بإدارة الأمن والسلامة خلال مدة لا تتجاوز يومين من تاريخه لإنهاء إجراءات التحقيق.</p>' +
-    '<table class="lc"><tr><th colspan="4" class="big">المقر بما فيه</th></tr>' +
-      '<tr><td class="s">الاسم</td><td>' + srEsc(d.holderName||'') + '</td><td class="s">الرقم الوظيفي</td><td></td></tr>' +
-      '<tr><td class="s">الوظيفة</td><td></td><td class="s">التوقيع</td><td></td></tr></table>' +
-    '<div class="tag">للاستعمال الرسمي</div>' +
-    '<table class="lc"><tr><td class="s">تم إلغاء البطاقة</td><td style="width:6%"></td><td class="s" style="width:9%">مدان</td><td style="width:6%"></td><td class="s" style="width:12%">غير مدان</td><td style="width:6%"></td><td class="s">مبلغ الفقدان</td><td></td></tr>' +
-      '<tr><td class="s">الموظف المختص</td><td colspan="3"></td><td class="s">التوقيع</td><td></td><td class="s">التاريخ</td><td></td></tr></table>' +
-    (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt=""></div>' : '') +
-    '<p class="note"><b>مبلغ الفقدان: 500 ريال لكل بطاقة عمل وتصريح مركبة.</b></p>';
-  return srOpenPrintDoc('بلاغ فقدان', body);
+  const C = 397, it = [];
+  const c = (x,y,v)=> it.push(['t', x, y, v, 'c', 2.0]);
+  c(887, 201, isVeh ? '' : d.lostItemNumber); c(574, 201, d.contractNumber); c(235, 201, d.unifiedNumber);
+  c(887, 263, isVeh ? d.lostItemNumber : ''); c(574, 263, d.vehicleType); c(235, 263, d.plateNumber);
+  c(C, 379, d.entityDept); c(C, 436, d.holderName); c(C, 492, d.nationality); c(C, 549, d.idNumber); c(C, 606, d.lossCount);
+  c(C, 663, d.lossDate); c(C, 720, d.employerReportDate); c(C, 777, d.securityReportDate); c(C, 834, d.expiryDate); c(C, 890, d.phone);
+  c(790, 1198, d.holderName);
+  if(opts.stampSrc) it.push(['s', 300, 1306, 170, opts.stampSrc]);
+  const bg = srAbs('../request/forms/loss_report-1.jpg');
+  return srOpenPrintDoc('بلاغ فقدان', srOverlayPage(bg, 1241, 1754, it, 100), SR_OVERLAY_CSS);
 }
 
-// "طلب إصدار بطاقة" — follows the official form (page 1 = form, page 2 = instructions).
+// "طلب إصدار بطاقة" — original form (page 1 = form, page 2 = instructions), 1152x1778 backgrounds.
 function srPrintBadge(d, opts){
   opts = opts || {}; d = d || {};
-  const cb = (on, label)=> '<span class="cbx">' + (on ? '&#9745;' : '&#9744;') + ' ' + label + '</span>';
-  const eq = (k, v)=> d[k] === v;
-  const row = (ar, v, en)=> '<tr><td class="s" style="width:24%">' + ar + '</td><td>' + srEsc(v||'') + '</td><td class="en">' + en + '</td></tr>';
-  const sig = (who)=> '<div class="sgl"><span>' + who + ': ' + '.'.repeat(34) + '</span><span>التوقيع: ' + '.'.repeat(22) + '</span><span>التاريخ: &nbsp;&nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;١٤ هـ</span></div>';
-  const meta = []; if(opts.requestId) meta.push('رقم الطلب: ' + srEsc(opts.requestId)); meta.push(srToday()); if(opts.statusLine) meta.push(srEsc(opts.statusLine));
-  const page1 = '<div class="bpage">' + srWatermark() + srLetterhead() +
-    '<h1 style="margin:2px 0">طلب إصدار بطاقة</h1><div class="sub" style="color:#d00000;font-weight:700;font-size:14px;margin-bottom:6px">يعبأ الطلب طباعة</div>' +
-    '<table class="bc"><tr><td class="p" style="width:13%">مقدم الطلب</td><td>' +
-      '<div class="cbr">' + cb(eq('entityType','مدينة رأس الخير للصناعات التعدينية'),'مدينة رأس الخير للصناعات التعدينية') + cb(eq('entityType','جهة حكومية'),'جهة حكومية') + cb(eq('entityType','شركة / مؤسسة'),'شركة / مؤسسة') + '</div>' +
-      '<div><b>اسم الإدارة / الجهة:</b> ' + srEsc(d.entityName||'') + '</div><div><b>رقم الإدارة:</b> ' + srEsc(d.departmentNumber||'') + '</div></td>' +
-      '<td class="p" style="width:9%">الموظف</td><td>' + cb(eq('employeeType','رسمي'),'رسمي') + '<br>' + cb(eq('employeeType','مؤقت'),'مؤقت') + '<br>' + cb(eq('employeeType','متدرب'),'متدرب') + '</td>' +
-      '<td class="p" style="width:9%">البطاقة</td><td>' + cb(eq('requestType','إصدار'),'إصدار') + ' ' + cb(eq('requestType','تجديد'),'تجديد') + '<br>' + cb(eq('requestType','استبدال'),'استبدال') + '<br>' + cb(eq('requestType','بدل تالف / فاقد'),'بدل تالف / فاقد') + '</td></tr></table>' +
-    '<table class="bc" style="margin-top:4px">' +
-      '<tr><th colspan="3" style="background:#e9e2ff">المعلومات الشخصية</th></tr>' + row('الاسم', d.fullName, 'Name') + row('الرقم الوظيفي', d.employeeNumber, 'Employee No.') + row('فصيلة الدم', d.bloodType, 'Blood Group') + row('مسمى الوظيفة', d.jobTitle, 'Job Title') +
-      row('تاريخ الميلاد', d.dob, 'Date Of Birth') + row('الجنسية', d.nationality, 'Nationality') + row('رقم البطاقة المدنية / الإقامة', d.idNumber, 'Nationality Booklet / Iqama No.') +
-      row('مكان الإصدار', d.issuePlace, 'Place Of Issue') + row('تاريخ الإصدار', d.issueDate, 'Date Of Issue') + row('تاريخ الإنتهاء', d.expiryDate, 'Date Of Exp.') +
-      row('رقم العقد', d.contractNumber, 'Contract No.') + row('تاريخ إنتهاء العقد', d.contractExpiry, 'No. of Contract Completion') + '</table>' +
-    '<div class="bx"><b>المكرم مدير إدارة الأمن الصناعي والسلامة:</b><div class="decl2">نتقدم بطلب البطاقة الموضحة أدناه لمتطلبات العمل ونتعهد بموجب توقيعنا أدناه بالعمل على إعادة البطاقة فور إنتهاء العمل الذي أصدرت من أجله أو إنتهاء صلاحيتها (أيهما ينتهي أولًا) والإبلاغ عن فقدانها والالتزام بالتعليمات الصادرة من وزارة الداخلية بهذا الخصوص بالقرار رقم ٢١٣٩ وتاريخ ٨/٤/١٤٠٣هـ، والموضحة في خلف النموذج.</div>' +
-      '<div class="cbr" style="margin-top:6px">' + cb(eq('cardType','بطاقة رجل أمن'),'بطاقة رجل أمن') + cb(eq('cardType','بطاقة موظفي مدينة رأس الخير'),'بطاقة موظفي مدينة رأس الخير للصناعات التعدينية') + cb(eq('cardType','بطاقة الشركات'),'بطاقة الشركات') + '</div></div>' +
-    '<div class="bx"><b>مدير الجهة المتقدمة بالطلب المسؤول عن صحة جميع المعلومات أعلاه:</b>' + sig('الاسم') + '</div>' +
-    '<div class="bx"><b>تحت مسئوليتي الكاملة أؤيد طلب المذكور للبطاقة الموضحة أعلاه</b><div style="margin:4px 0">اسم الإدارة المشرفة على المقاول: ' + '.'.repeat(70) + '</div>' + sig('مدير الإدارة') + '</div>' +
-    '<div class="bx off"><div class="cbr"><b>للاستخدام الرسمي</b>' + cb(false,'البطاقة القديمة لا تزال بعهدته') + cb(false,'تم استعادة البطاقة القديمة') + '</div>' +
-      '<div>البصمات ' + cb(false,'تم رفع البصمات برقم') + ' ' + '.'.repeat(20) + ' &nbsp; الاسم: ' + '.'.repeat(16) + ' التوقيع: ' + '.'.repeat(12) + '</div>' +
-      '<div>البطاقات: صرف له بطاقة رقم: ' + '.'.repeat(16) + ' تاريخ الإصدار: &nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;١٤ هـ &nbsp; تاريخ الانتهاء: &nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;١٤ هـ</div>' +
-      '<div class="cbr"><span>إدخلت المعلومات بواسطة — الاسم: ' + '.'.repeat(14) + ' التوقيع: ' + '.'.repeat(10) + '</span><span>مسؤول الإصدار — الاسم: ' + '.'.repeat(14) + ' التوقيع: ' + '.'.repeat(10) + '</span></div>' +
-      (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt="" style="width:110px"></div>' : '') + '</div>' +
-    '<div class="bx">أقر بأنني إستلمت البطاقة الموضحة بياناتها أعلاه، وأتعهد بعدم تصوير البطاقة صودرة ملونة واستخدامها للدخول بدلًا من الأصل مهما كانت الأسباب والمبررات.' + sig('الاسم') + '</div>' +
-    '<div class="note" style="color:#d00000"><b>ملاحظة: تعليمات هامة بالخلف يجب التقيد بها</b></div></div>';
-  const li = t=> '<li>' + t + '</li>';
-  const page2 = '<div style="page-break-before:always"><h1 style="margin:20px 0">تعليمات هامة يجب التقيد بها</h1><ul class="ins">' + [
-    'تحدد البطاقة المطلوبة بالنسبة لموظفي مدينة رأس الخير للصناعات التعدينية من قبل مدير إدارة الموظف، أما بالنسبة للعاملين لدى الشركات أو المؤسسات فتحدد البطاقة من قبل مدير الشركة أو المؤسسة التي يعمل بها الموظف ويتطلب موافقة مدير الإدارة المشرفة على العقد.',
-    'يجب المحافظة على البطاقة وعدم اعارتها أو رهنها لدى أي جهة كانت والإبلاغ الفوري عن فقدانها.',
-    'يجب عدم إبرازها للفنادق والشقق المفروشة وشركات التقسيط والتأجير وغيرها وعدم السماح لهم بأخذ صورة منها.',
-    'يجب استعادة البطاقة عند إعارة الموظف السعودي للعمل لدى جهة أخرى غير مدينة رأس الخير للصناعات التعدينية، كذلك يجب إستعادتها عند أستلام الموظف غير السعودي لجواز سفره لأي غرض من الأغراض.',
-    'يجب على موظف مدينة رأس الخير للصناعات التعدينية البدء بإجراءات تجديد البطاقة في الأسبوع السابق لتاريخ انتهائها.',
-    'يجب على الشركات والمؤسسات إعادة بطاقات موظفيهم في اليوم التالي لإنتهاء صلاحيتها أو إنتهاء العمل الذي صدرت من أجله (أيهما أولًا) وفي حالة عدم إلتزامهم بذلك يلزمون بدفع مبلغ (١٠٠) ريال عن كل بطاقة وعن كل أسبوع يمضي بعد إنتهائها وبحد اقصى هو أربعة اسابيع من تاريخ انتهاء البطاقة وبعدها لإدارة الأمن الصناعي والسلامة الحق في إتخاذ التدابير اللازمة.',
-    'إن عدم تجديد البطاقة في حينه يترتب عليه منع الموظف من دخول المنشأة ولا تتحمل إدارة الأمن الصناعي والسلامة مسؤولية ذلك.',
-    'يجب عدم استخدام البطاقة لغير الغرض الذي صدرت من أجله.',
-    'إن فقدان البطاقة يترتب عليه غرامة مالية في حالة ثبوت الإهمال أو التقصير.',
-    'يجب الإلتزام بعدم تصوير البطاقة صورة ملونة واستخدامها للدخول بدلًا من الأصل مهما كانت الأسباب والمبررات.'
-  ].map(li).join('') + '</ul></div>';
-  return srOpenPrintDoc('طلب إصدار بطاقة', page1 + page2);
+  const it = [];
+  const tick = (cond, x, y)=>{ if(cond) it.push(['k', x, y]); };
+  const r = (x,y,v)=> it.push(['t', x, y, v, 'r', 1.75]);
+  tick(d.entityType === 'مدينة رأس الخير للصناعات التعدينية', 627, 314); tick(d.entityType === 'جهة حكومية', 627, 350); tick(d.entityType === 'شركة / مؤسسة', 627, 385);
+  r(880, 323, d.entityName); r(880, 375, d.departmentNumber);
+  tick(d.employeeType === 'رسمي', 426, 314); tick(d.employeeType === 'مؤقت', 426, 350); tick(d.employeeType === 'متدرب', 426, 385);
+  tick(d.requestType === 'إصدار', 183, 314); tick(d.requestType === 'تجديد', 226, 349); tick(d.requestType === 'استبدال', 153, 349);
+  tick(d.requestType === 'بدل تالف / فاقد', 226, 383); tick(d.requestType === 'بدل تالف / فاقد', 153, 383);
+  r(976, 436, d.fullName); r(920, 468, d.employeeNumber); r(706, 468, d.bloodType); r(918, 503, d.jobTitle);
+  r(955, 538, d.nationality); r(703, 538, d.dob); r(830, 570, d.idNumber); r(928, 606, d.issuePlace); r(696, 606, d.issueDate);
+  r(935, 640, d.expiryDate); r(972, 676, d.contractNumber); r(696, 676, d.contractExpiry);
+  tick(d.cardType === 'بطاقة رجل أمن', 1032, 900); tick(d.cardType === 'بطاقة موظفي مدينة رأس الخير', 780, 900); tick(d.cardType === 'بطاقة الشركات', 417, 900);
+  if(opts.stampSrc) it.push(['s', 135, 1212, 100, opts.stampSrc]);
+  const b1 = srAbs('../request/forms/badge_form-1.jpg'), b2 = srAbs('../request/forms/badge_form-2.jpg');
+  const body = '<div class="opb">' + srOverlayPage(b1, 1152, 1778, it, 91) + '</div>' + srOverlayPage(b2, 1152, 1778, [], 91);
+  return srOpenPrintDoc('طلب إصدار بطاقة', body, SR_OVERLAY_CSS);
 }
 
 // GRRK — Public request page for representatives/employees (no admin data).

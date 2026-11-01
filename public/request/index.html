@@ -699,7 +699,6 @@ function srPrintVisitForm(data, opts){
       '<li>يُشترط ألا تتجاوز مدة الزيارة (72) ساعة من بداية تاريخ التصريح.</li>' +
       '<li>في حالة التمديد يتم رفع طلب آخر لإدارة الأمن الصناعي والسلامة.</li>' +
       '<li>التقيّد بالزي الرسمي اثناء الزيارة والدخول للمقرات الرسمية.</li></ol></div>' +
-    '<div class="note">' + meta.join(' — ') + '</div>' +
     (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt=""></div>' : '');
   return srOpenPrintDoc('طلب دخول زوّار', body);
 }
@@ -717,7 +716,7 @@ function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, titl
     '<div class="hd"><img src="' + srAbs('../brand/logo-header.png') + '" alt=""><div></div></div>' +
     '<h1>' + srEsc(title||'تصريح دخول أفراد') + '</h1>' +
     (opts.draft ? '<div class="sub" style="color:#b00020;font-weight:700">نسخة الطلب — غير معتمدة حتى يصدرها مشرف علاقات حكومية</div>' : '') +
-    '<div style="display:flex;justify-content:space-between;font-weight:700;margin:10px 0"><span>رقم التصريح : ' + srEsc(opts.number || r.id || '') + '</span><span>التاريخ : ' + srToday() + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;font-weight:700;margin:10px 0"><span>رقم التصريح : ' + srEsc(opts.number || (opts.draft ? '' : (r.id || ''))) + '</span><span>التاريخ : ' + srToday() + '</span></div>' +
     '<table class="vt"><tr><th style="width:8%" class="big">عدد</th><th class="big">الاسم</th><th class="big">الجنسية</th><th class="big">رقم الهوية الوطنية / الإقامة / جواز السفر</th><th class="big">الاسم باللغة الانجليزية</th></tr>' + rows.join('') + '</table>' +
     '<p style="text-align:center;margin:14px 0 6px"><b>يصرح للمذكور بياناته أعلاه بالدخول إلى : مدينة رأس الخير للصناعات التعدينية</b></p>' +
     '<div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:6px"><span>للفترة من تاريخ : ' + srEsc(fmt(from)) + '</span><span>حتى تاريخ : ' + srEsc(fmt(to)) + '</span></div>' +
@@ -754,7 +753,7 @@ function srPrintLoss(d, opts){
     '<table class="lc"><tr><td class="s">تم إلغاء البطاقة</td><td style="width:6%"></td><td class="s" style="width:9%">مدان</td><td style="width:6%"></td><td class="s" style="width:12%">غير مدان</td><td style="width:6%"></td><td class="s">مبلغ الفقدان</td><td></td></tr>' +
       '<tr><td class="s">الموظف المختص</td><td colspan="3"></td><td class="s">التوقيع</td><td></td><td class="s">التاريخ</td><td></td></tr></table>' +
     (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt=""></div>' : '') +
-    '<p class="note"><b>مبلغ الفقدان: 500 ريال لكل بطاقة عمل وتصريح مركبة.</b></p><div class="note">' + meta.join(' — ') + '</div>';
+    '<p class="note"><b>مبلغ الفقدان: 500 ريال لكل بطاقة عمل وتصريح مركبة.</b></p>';
   return srOpenPrintDoc('بلاغ فقدان', body);
 }
 
@@ -774,7 +773,7 @@ function srPrintBadge(d, opts){
       '<td class="p" style="width:9%">الموظف</td><td>' + cb(eq('employeeType','رسمي'),'رسمي') + '<br>' + cb(eq('employeeType','مؤقت'),'مؤقت') + '<br>' + cb(eq('employeeType','متدرب'),'متدرب') + '</td>' +
       '<td class="p" style="width:9%">البطاقة</td><td>' + cb(eq('requestType','إصدار'),'إصدار') + ' ' + cb(eq('requestType','تجديد'),'تجديد') + '<br>' + cb(eq('requestType','استبدال'),'استبدال') + '<br>' + cb(eq('requestType','بدل تالف / فاقد'),'بدل تالف / فاقد') + '</td></tr></table>' +
     '<table class="bc" style="margin-top:4px">' +
-      row('الاسم', d.fullName, 'Name').replace('<tr>','<tr><td class="p" rowspan="12" style="width:5%;writing-mode:vertical-rl">المعلومات الشخصية</td>') + row('الرقم الوظيفي', d.employeeNumber, 'Employee No.') + row('فصيلة الدم', d.bloodType, 'Blood Group') + row('مسمى الوظيفة', d.jobTitle, 'Job Title') +
+      '<tr><th colspan="3" style="background:#e9e2ff">المعلومات الشخصية</th></tr>' + row('الاسم', d.fullName, 'Name') + row('الرقم الوظيفي', d.employeeNumber, 'Employee No.') + row('فصيلة الدم', d.bloodType, 'Blood Group') + row('مسمى الوظيفة', d.jobTitle, 'Job Title') +
       row('تاريخ الميلاد', d.dob, 'Date Of Birth') + row('الجنسية', d.nationality, 'Nationality') + row('رقم البطاقة المدنية / الإقامة', d.idNumber, 'Nationality Booklet / Iqama No.') +
       row('مكان الإصدار', d.issuePlace, 'Place Of Issue') + row('تاريخ الإصدار', d.issueDate, 'Date Of Issue') + row('تاريخ الإنتهاء', d.expiryDate, 'Date Of Exp.') +
       row('رقم العقد', d.contractNumber, 'Contract No.') + row('تاريخ إنتهاء العقد', d.contractExpiry, 'No. of Contract Completion') + '</table>' +
@@ -788,7 +787,7 @@ function srPrintBadge(d, opts){
       '<div class="cbr"><span>إدخلت المعلومات بواسطة — الاسم: ' + '.'.repeat(14) + ' التوقيع: ' + '.'.repeat(10) + '</span><span>مسؤول الإصدار — الاسم: ' + '.'.repeat(14) + ' التوقيع: ' + '.'.repeat(10) + '</span></div>' +
       (opts.stampSrc ? '<div class="stampbox"><img src="' + opts.stampSrc + '" alt="" style="width:110px"></div>' : '') + '</div>' +
     '<div class="bx">أقر بأنني إستلمت البطاقة الموضحة بياناتها أعلاه، وأتعهد بعدم تصوير البطاقة صودرة ملونة واستخدامها للدخول بدلًا من الأصل مهما كانت الأسباب والمبررات.' + sig('الاسم') + '</div>' +
-    '<div class="note" style="color:#d00000"><b>ملاحظة: تعليمات هامة بالخلف يجب التقيد بها</b> — ' + meta.join(' — ') + '</div></div>';
+    '<div class="note" style="color:#d00000"><b>ملاحظة: تعليمات هامة بالخلف يجب التقيد بها</b></div></div>';
   const li = t=> '<li>' + t + '</li>';
   const page2 = '<div style="page-break-before:always"><h1 style="margin:20px 0">تعليمات هامة يجب التقيد بها</h1><ul class="ins">' + [
     'تحدد البطاقة المطلوبة بالنسبة لموظفي مدينة رأس الخير للصناعات التعدينية من قبل مدير إدارة الموظف، أما بالنسبة للعاملين لدى الشركات أو المؤسسات فتحدد البطاقة من قبل مدير الشركة أو المؤسسة التي يعمل بها الموظف ويتطلب موافقة مدير الإدارة المشرفة على العقد.',
@@ -1195,7 +1194,7 @@ function startApp(){
       return;
     }
     const today = new Date().toLocaleDateString('ar-SA-u-ca-gregory');
-    srOpenPrintDoc(def.labelAr, srLetterhead() + `<h1>${esc(def.labelAr)}</h1><div class="sub">${reqId ? ('رقم الطلب: '+esc(reqId)+' — ') : ''}${today}</div>` + submitterRowsHtml() + formTableHtml(def, data));
+    srOpenPrintDoc(def.labelAr, srLetterhead() + `<h1>${esc(def.labelAr)}</h1>` + submitterRowsHtml() + formTableHtml(def, data));
   }
 
   function validateForm(def){

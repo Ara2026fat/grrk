@@ -1,7 +1,7 @@
 // GRRK service worker — minimal, just enough to make the app installable
 // (Chrome requires an active SW with a fetch handler before it will fire
 // beforeinstallprompt) and to let the shell page load once offline.
-const CACHE = 'grrk-req-v1';
+const CACHE = 'grrk-req-v2';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

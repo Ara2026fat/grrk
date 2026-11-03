@@ -376,7 +376,64 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T08:58:47Z', dmy: '03/11/2026', hm: '11:58' };
+// ===== Admin lock screen: the app stays hidden until the admin password is entered =====
+// Only a salted, stretched SHA-256 of the password is stored (lock.hash) — never the password itself.
+// NOTE: this is a front door for a static site. The real protection of the data is the admin key on the backend.
+function grrkSha256(msg){
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const enc = unescape(encodeURIComponent(msg)), l = enc.length, w = [];
+  for(let z = 0; z < (((l + 8) >> 6) + 1) * 16; z++) w[z] = 0;
+  for(let i = 0; i < l; i++) w[i >> 2] |= enc.charCodeAt(i) << (24 - (i % 4) * 8);
+  w[l >> 2] |= 0x80 << (24 - (l % 4) * 8); w[(((l + 8) >> 6) + 1) * 16 - 1] = l * 8;
+  let h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const rr = function(x, n){ return (x >>> n) | (x << (32 - n)); };
+  for(let o = 0; o < w.length; o += 16){
+    const s = w.slice(o, o + 16); for(let i = 16; i < 64; i++){ const a = s[i-15], b = s[i-2]; s[i] = (s[i-16] + (rr(a,7) ^ rr(a,18) ^ (a >>> 3)) + s[i-7] + (rr(b,17) ^ rr(b,19) ^ (b >>> 10))) | 0; }
+    let [a,b,c,d,e,f,g,hh] = h;
+    for(let i = 0; i < 64; i++){
+      const t1 = (hh + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & f) ^ (~e & g)) + K[i] + s[i]) | 0, t2 = ((rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h = [(h[0]+a)|0,(h[1]+b)|0,(h[2]+c)|0,(h[3]+d)|0,(h[4]+e)|0,(h[5]+f)|0,(h[6]+g)|0,(h[7]+hh)|0];
+  }
+  return h.map(function(x){ return ('00000000' + (x >>> 0).toString(16)).slice(-8); }).join('');
+}
+function grrkStretch(pw){ const S = 'grrk-admin-v1'; let h = grrkSha256(S + pw); for(let i = 0; i < 4000; i++) h = grrkSha256(h + S + pw); return h; }
+
+(function(){
+  if(typeof document === 'undefined') return;           // build-time hashing in Node
+  const HASH = '79d3162fd65f869bd574c9892471fdfef7d9bcf197eed1bea0d186c527a7434e', KEY = 'grrk_admin_unlock', FAIL = 'grrk_admin_fail';
+  try{ if(localStorage.getItem(KEY) === HASH) return; }catch(e){}
+  const st = document.createElement('style');
+  st.textContent = 'html.grrk-locked body > *:not(#grrk-lock){ visibility:hidden !important } #grrk-lock{ position:fixed; inset:0; z-index:2147483647; background:linear-gradient(160deg,#071a45,#0b2a6b 60%,#17348a); display:flex; align-items:center; justify-content:center; font-family:Tahoma,Arial,sans-serif; direction:rtl; color:#fff } #grrk-lock .b{ width:min(360px,90vw); text-align:center } #grrk-lock img{ width:84px; height:84px; border-radius:20px; margin-bottom:14px } #grrk-lock input{ width:100%; box-sizing:border-box; padding:14px; border-radius:12px; border:0; font-size:18px; text-align:center; margin-top:14px; direction:ltr } #grrk-lock button{ width:100%; margin-top:12px; padding:14px; border:0; border-radius:12px; background:#fff; color:#0b2a6b; font-weight:700; font-size:17px } #grrk-lock .m{ min-height:22px; margin-top:12px; color:#ffb4b4; font-size:14px }';
+  document.head.appendChild(st);
+  document.documentElement.classList.add('grrk-locked');
+  const box = document.createElement('div'); box.id = 'grrk-lock';
+  box.innerHTML = '<div class="b"><img src="icon-192.png" alt=""><h2 style="margin:0">لوحة التحكم</h2><p style="opacity:.8;margin:8px 0 0">هذه الصفحة خاصة بالأدمن — أدخل كلمة المرور</p><input id="grrk-pw" type="password" autocomplete="current-password" placeholder="كلمة المرور"><button id="grrk-go">دخول</button><div class="m" id="grrk-msg"></div></div>';
+  document.documentElement.appendChild(box);
+  const pw = box.querySelector('#grrk-pw'), msg = box.querySelector('#grrk-msg');
+  function state(){ try{ return JSON.parse(localStorage.getItem(FAIL) || '{}'); }catch(e){ return {}; } }
+  function go(){
+    const s = state(), now = Date.now();
+    if(s.until && now < s.until){ msg.textContent = 'محاولات كثيرة — انتظر ' + Math.ceil((s.until - now) / 1000) + ' ثانية'; return; }
+    if(!pw.value){ msg.textContent = 'اكتب كلمة المرور'; return; }
+    setTimeout(function(){
+      if(grrkStretch(pw.value) === HASH){
+        try{ localStorage.setItem(KEY, HASH); localStorage.removeItem(FAIL); }catch(e){}
+        box.remove(); document.documentElement.classList.remove('grrk-locked'); st.remove();
+      }else{
+        const n = (s.n || 0) + 1, wait = n >= 5 ? Math.min(600, 30 * Math.pow(2, n - 5)) : 0;
+        try{ localStorage.setItem(FAIL, JSON.stringify({ n:n, until: wait ? Date.now() + wait * 1000 : 0 })); }catch(e){}
+        msg.textContent = wait ? 'كلمة المرور خاطئة — انتظر ' + wait + ' ثانية' : 'كلمة المرور خاطئة'; pw.value = '';
+      }
+    }, 30);
+  }
+  box.querySelector('#grrk-go').addEventListener('click', go);
+  pw.addEventListener('keydown', function(e){ if(e.key === 'Enter') go(); });
+  setTimeout(function(){ try{ pw.focus(); }catch(e){} }, 100);
+})();
+
+const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T14:35:52Z', dmy: '03/11/2026', hm: '17:35' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -794,6 +851,11 @@ function renderDashboard(root, ctx){
             <div class="dash-cat-label">${isAr?'صندوق الطلبات':'Requests Inbox'}</div>
             <div class="dash-cat-sub">${isAr?'مراجعة واعتماد':'Review & approve'}</div>
           </button>
+          <button type="button" class="dash-cat-card" data-sr-jump="users">
+            <div class="icon3d" style="--i1:#7FD6A8;--i2:#2E9966">${SR_ICONS.employees}</div>
+            <div class="dash-cat-label">${isAr?'المستخدمون':'Users'}</div>
+            <div class="dash-cat-sub">${isAr?'الموافقة على التسجيل':'Approve registrations'}</div>
+          </button>
         </div>
       </div>
 
@@ -814,7 +876,7 @@ function renderDashboard(root, ctx){
     btn.addEventListener('click', ()=>{
       const mode = btn.getAttribute('data-sr-jump');
       const form = btn.getAttribute('data-sr-form');
-      try{ localStorage.setItem('grrk_sr_jump', JSON.stringify(mode==='form' ? {mode:'form', form} : {mode:'inbox'})); }catch(e){}
+      try{ localStorage.setItem('grrk_sr_jump', JSON.stringify(mode==='form' ? {mode:'form', form} : {mode:mode==='users'?'users':'inbox'})); }catch(e){}
       ctx.navigate('servicerequests');
     });
   });
@@ -5717,6 +5779,314 @@ function srPrintBadge(d, opts){
   return srOpenPrintDoc('طلب إصدار بطاقة', body, SR_OVERLAY_CSS);
 }
 
+// ===== Sharing helpers (WhatsApp / e-mail / PDF files) — shared by the admin app and the public request page =====
+
+// Normalise a phone number to the international digits used by wa.me (Saudi numbers: 05xxxxxxxx -> 9665xxxxxxxx).
+function srPhoneIntl(p){
+  let d = String(p||'').replace(/[^\d+]/g, '');
+  if(d.startsWith('+')) d = d.slice(1);
+  if(d.startsWith('00')) d = d.slice(2);
+  if(/^0\d{9}$/.test(d)) d = '966' + d.slice(1);
+  else if(/^5\d{8}$/.test(d)) d = '966' + d;
+  return d;
+}
+function srWaLink(phone, text){ return 'https://wa.me/' + srPhoneIntl(phone) + '?text=' + encodeURIComponent(text||''); }
+function srMailLink(email, subject, body){ return 'mailto:' + encodeURIComponent(email||'') + '?subject=' + encodeURIComponent(subject||'') + '&body=' + encodeURIComponent(body||''); }
+
+function srLoadImg(src){
+  return new Promise(function(ok, no){ const i = new Image(); i.onload = function(){ ok(i); }; i.onerror = function(){ no(new Error('img')); }; i.src = src; });
+}
+
+// A one-page PDF that contains a JPEG (no external library needed). Page height follows the image ratio.
+function srJpegToPdfBlob(jpg, w, h){
+  const enc = new TextEncoder(), parts = [], offs = [];
+  let len = 0;
+  const push = function(x){ const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const PW = 595.28, PH = +(PW * h / w).toFixed(2);
+  const obj = function(n, body){ offs[n] = len; push(n + ' 0 obj\n'); body(); push('\nendobj\n'); };
+  push('%PDF-1.4\n');
+  obj(1, function(){ push('<< /Type /Catalog /Pages 2 0 R >>'); });
+  obj(2, function(){ push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'); });
+  obj(3, function(){ push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'); });
+  obj(4, function(){ push('<< /Type /XObject /Subtype /Image /Width ' + w + ' /Height ' + h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpg.length + ' >>\nstream\n'); push(jpg); push('\nendstream'); });
+  const cs = 'q ' + PW + ' 0 0 ' + PH + ' 0 0 cm /Im0 Do Q';
+  obj(5, function(){ push('<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream'); });
+  const xref = len;
+  push('xref\n0 6\n0000000000 65535 f \n');
+  for(let n = 1; n <= 5; n++) push(String(offs[n]).padStart(10, '0') + ' 00000 n \n');
+  push('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+  return new Blob(parts, { type:'application/pdf' });
+}
+function srCanvasToPdf(canvas){
+  return new Promise(function(res){
+    canvas.toBlob(async function(b){
+      const buf = new Uint8Array(await b.arrayBuffer());
+      res(srJpegToPdfBlob(buf, canvas.width, canvas.height));
+    }, 'image/jpeg', 0.92);
+  });
+}
+
+// Opens the phone's share sheet with the file (WhatsApp, Mail, ...); falls back to a normal download.
+async function srShareFile(blob, filename, text){
+  try{
+    const f = new File([blob], filename, { type: blob.type });
+    if(navigator.canShare && navigator.canShare({ files:[f] })){
+      await navigator.share({ files:[f], text: text || '' });
+      return 'shared';
+    }
+  }catch(e){ if(e && e.name === 'AbortError') return 'cancelled'; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  return 'downloaded';
+}
+
+// Wraps Arabic text on a canvas (right-to-left); returns the y after the last line.
+function srCanvasText(ctx, text, x, y, maxW, lineH){
+  const words = String(text).split(/\s+/); let line = '';
+  for(let i = 0; i < words.length; i++){
+    const t = line ? line + ' ' + words[i] : words[i];
+    if(ctx.measureText(t).width > maxW && line){ ctx.fillText(line, x, y); y += lineH; line = words[i]; } else line = t;
+  }
+  if(line){ ctx.fillText(line, x, y); y += lineH; }
+  return y;
+}
+
+// "خطاب قبول تسجيل مستخدم" as a PDF blob (letterhead, registration number, stamp when given).
+async function srRegistrationLetterPdf(rep, opts){
+  opts = opts || {};
+  const W = 1240, H = 1754, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  try{ const lh = await srLoadImg(srAbs('../brand/letterhead.png')); const w = 640, h = lh.height * w / lh.width; x.drawImage(lh, W - 90 - w, 70, w, h); }catch(e){}
+  x.direction = 'rtl'; x.textAlign = 'right'; x.fillStyle = '#111';
+  const R = W - 110, TW = W - 220;
+  x.font = 'bold 54px Tahoma, Arial, sans-serif'; x.textAlign = 'center';
+  x.fillText('خطاب قبول تسجيل مستخدم', W / 2, 440);
+  x.textAlign = 'right'; x.font = '34px Tahoma, Arial, sans-serif';
+  x.fillText('التاريخ: ' + srToday(), R, 520);
+  x.font = 'bold 40px Tahoma, Arial, sans-serif';
+  x.fillText('الأستاذ / ' + (rep.name || ''), R, 620);
+  if(rep.company) x.fillText('الجهة: ' + rep.company, R, 680);
+  x.font = '36px Tahoma, Arial, sans-serif';
+  let y = srCanvasText(x, 'السلام عليكم ورحمة الله وبركاته،', R, 770, TW, 58);
+  y = srCanvasText(x, 'نفيدكم بأنه تمت الموافقة على تسجيلكم كمستخدم في نظام طلبات العلاقات الحكومية — مدينة رأس الخير للصناعات التعدينية. وفيما يلي رقم التسجيل الخاص بكم، يرجى الاحتفاظ به واستخدامه عند تقديم أي طلب:', R, y + 10, TW, 58);
+  x.fillStyle = '#eef2ff'; x.strokeStyle = '#0b2a6b'; x.lineWidth = 4;
+  x.fillRect(W / 2 - 300, y + 40, 600, 150); x.strokeRect(W / 2 - 300, y + 40, 600, 150);
+  x.fillStyle = '#0b2a6b'; x.textAlign = 'center'; x.font = 'bold 84px Tahoma, Arial, sans-serif'; x.direction = 'ltr';
+  x.fillText(rep.rep_id || '', W / 2, y + 150);
+  x.direction = 'rtl'; x.textAlign = 'right'; x.fillStyle = '#111'; x.font = '34px Tahoma, Arial, sans-serif';
+  y += 270;
+  if(opts.link){ y = srCanvasText(x, 'رابط تقديم الطلبات:', R, y, TW, 54); x.direction = 'ltr'; x.textAlign = 'left'; x.fillStyle = '#0b2a6b'; x.fillText(opts.link, 110, y); x.direction = 'rtl'; x.textAlign = 'right'; x.fillStyle = '#111'; y += 70; }
+  y = srCanvasText(x, 'مع تمنياتنا لكم بالتوفيق.', R, y + 10, TW, 54);
+  x.textAlign = 'center'; x.font = 'bold 36px Tahoma, Arial, sans-serif'; x.fillText('إدارة العلاقات الحكومية', 330, y + 70);
+  if(opts.stampSrc){ try{ const st = await srLoadImg(opts.stampSrc); const sw = 300, sh = st.height * sw / st.width; x.drawImage(st, 180, y + 95, sw, sh); }catch(e){} }
+  return srCanvasToPdf(c);
+}
+
+// ===== Photo tool: crop + remove a plain background + download / share (WhatsApp, e-mail ...) =====
+// Works fully on the device (nothing is uploaded). Background removal is colour-based: it removes the
+// plain backdrop that touches the photo's edges (like ID-photo backgrounds), without touching the subject.
+
+function srRenderPhotoTool(root, o){
+  o = o || {};
+  const toast = o.toast || function(){};
+  const BG_CHOICES = [['transparent','شفاف (PNG)'],['#ffffff','أبيض'],['#d9e7ff','أزرق فاتح'],['#e9e9e9','رمادي']];
+  let src = null;                 // working canvas of the loaded photo
+  let crop = { x:0, y:0, w:1, h:1 };
+  let ratio = 3/4;                // w/h, or null for free
+  let cut = null;                 // cropped canvas
+  let bgOn = true, tol = 40, bgFill = 'transparent', result = null;
+
+  root.innerHTML = `
+    <div class="glass" style="margin-bottom:14px">
+      <div class="eyebrow">أداة الصور</div>
+      <p class="muted" style="margin-top:8px">اختر صورة، اقصّها، وأزل خلفيتها، ثم أرسلها إلى جوالك أو بريدك. الصورة تُعالَج على جهازك فقط ولا تُرفع لأي مكان.</p>
+      <label class="btn primary block" style="margin-top:12px;text-align:center;cursor:pointer">📷 اختيار صورة
+        <input type="file" id="sr-ph-file" accept="image/*" style="display:none">
+      </label>
+    </div>
+    <div id="sr-ph-crop" style="display:none">
+      <div class="card" style="padding:12px">
+        <div class="eyebrow" style="margin-bottom:8px">١) القص — حرّك الإطار، واسحب الزاوية السفلية لتغيير الحجم</div>
+        <div id="sr-ph-ratios" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <canvas id="sr-ph-cv" style="width:100%;touch-action:none;border-radius:10px;background:#222"></canvas>
+        <button class="btn primary block" id="sr-ph-apply" style="margin-top:12px">قص وإكمال</button>
+      </div>
+    </div>
+    <div id="sr-ph-bg" style="display:none">
+      <div class="card" style="padding:12px;margin-top:12px">
+        <div class="eyebrow" style="margin-bottom:8px">٢) الخلفية</div>
+        <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="sr-ph-on" checked> إزالة الخلفية</label>
+        <div id="sr-ph-bgopts">
+          <div class="muted" style="margin-bottom:4px">قوة الإزالة <span id="sr-ph-tolv">40</span></div>
+          <input type="range" id="sr-ph-tol" min="5" max="140" value="40" style="width:100%">
+          <div class="muted" style="margin:10px 0 4px">لون الخلفية الجديد</div>
+          <div id="sr-ph-fills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div id="sr-ph-prevwrap" style="margin-top:12px;border-radius:10px;overflow:hidden;background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0;background-color:#fff">
+          <canvas id="sr-ph-out" style="width:100%;display:block"></canvas>
+        </div>
+        <button class="btn primary block" id="sr-ph-share" style="margin-top:12px">📤 إرسال / مشاركة (واتساب، إيميل ...)</button>
+        <button class="btn block" id="sr-ph-dl" style="margin-top:8px">⬇ تنزيل الصورة</button>
+        <button class="btn ghost block" id="sr-ph-recrop" style="margin-top:8px">إعادة القص</button>
+      </div>
+    </div>
+    ${o.onBack ? '<button class="btn ghost block" id="sr-ph-back" style="margin-top:14px">رجوع</button>' : ''}
+  `;
+  const $ = function(s){ return root.querySelector(s); };
+  if(o.onBack) $('#sr-ph-back').addEventListener('click', o.onBack);
+
+  // ----- ratios / fills chips -----
+  const RATIOS = [['3:4 (شخصية)', 3/4], ['1:1', 1], ['4:3', 4/3], ['حر', null]];
+  function chip(label, on){ return '<button type="button" class="btn' + (on ? ' primary' : '') + '" style="padding:6px 12px;font-size:13px;width:auto;flex:1 1 30%">' + label + '</button>'; }
+  function paintRatios(){
+    $('#sr-ph-ratios').innerHTML = RATIOS.map(function(r){ return chip(r[0], r[1] === ratio); }).join('');
+    $('#sr-ph-ratios').querySelectorAll('button').forEach(function(b, i){ b.addEventListener('click', function(){ ratio = RATIOS[i][1]; fitCropToRatio(); paintRatios(); drawCrop(); }); });
+  }
+  function paintFills(){
+    $('#sr-ph-fills').innerHTML = BG_CHOICES.map(function(c){ return chip(c[1], c[0] === bgFill); }).join('');
+    $('#sr-ph-fills').querySelectorAll('button').forEach(function(b, i){ b.addEventListener('click', function(){ bgFill = BG_CHOICES[i][0]; paintFills(); render(); }); });
+  }
+
+  // ----- load photo -----
+  $('#sr-ph-file').addEventListener('change', function(ev){
+    const f = ev.target.files && ev.target.files[0]; if(!f) return;
+    const url = URL.createObjectURL(f), img = new Image();
+    img.onload = function(){
+      const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      src = document.createElement('canvas'); src.width = Math.round(img.naturalWidth * k); src.height = Math.round(img.naturalHeight * k);
+      src.getContext('2d').drawImage(img, 0, 0, src.width, src.height); URL.revokeObjectURL(url);
+      crop = { x:0, y:0, w:src.width, h:src.height }; fitCropToRatio();
+      $('#sr-ph-crop').style.display = 'block'; $('#sr-ph-bg').style.display = 'none';
+      const cv = $('#sr-ph-cv'); cv.width = Math.min(src.width, 900); cv.height = Math.round(cv.width * src.height / src.width);
+      paintRatios(); drawCrop(); $('#sr-ph-crop').scrollIntoView({ behavior:'smooth', block:'start' });
+    };
+    img.onerror = function(){ toast('تعذر فتح الصورة'); };
+    img.src = url;
+  });
+
+  function fitCropToRatio(){
+    if(!src) return;
+    let w = crop.w, h = crop.h;
+    if(ratio){ h = w / ratio; if(h > src.height){ h = src.height; w = h * ratio; } if(w > src.width){ w = src.width; h = w / ratio; } }
+    w = Math.max(40, Math.min(w, src.width)); h = Math.max(40, Math.min(h, src.height));
+    crop.w = w; crop.h = h; crop.x = Math.min(Math.max(0, crop.x), src.width - w); crop.y = Math.min(Math.max(0, crop.y), src.height - h);
+  }
+  function drawCrop(){
+    const cv = $('#sr-ph-cv'), c = cv.getContext('2d'), s = cv.width / src.width;
+    c.clearRect(0, 0, cv.width, cv.height); c.drawImage(src, 0, 0, cv.width, cv.height);
+    const x = crop.x * s, y = crop.y * s, w = crop.w * s, h = crop.h * s;
+    c.fillStyle = 'rgba(0,0,0,.55)';
+    c.fillRect(0, 0, cv.width, y); c.fillRect(0, y + h, cv.width, cv.height - y - h); c.fillRect(0, y, x, h); c.fillRect(x + w, y, cv.width - x - w, h);
+    c.strokeStyle = '#fff'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+    c.fillStyle = '#fff'; c.fillRect(x + w - 22, y + h - 22, 22, 22);
+    c.fillStyle = '#0b2a6b'; c.fillRect(x + w - 16, y + h - 16, 10, 10);
+  }
+  // pointer interaction on the crop canvas
+  (function(){
+    const cv = $('#sr-ph-cv'); let mode = null, st = null;
+    function pt(e){ const r = cv.getBoundingClientRect(); return { x:(e.clientX - r.left) / r.width * src.width, y:(e.clientY - r.top) / r.height * src.height }; }
+    cv.addEventListener('pointerdown', function(e){
+      if(!src) return; const p = pt(e), s = src.width / cv.getBoundingClientRect().width;
+      const dx = crop.x + crop.w - p.x, dy = crop.y + crop.h - p.y;
+      if(Math.abs(dx) < 36 * s && Math.abs(dy) < 36 * s) mode = 'resize';
+      else if(p.x >= crop.x && p.x <= crop.x + crop.w && p.y >= crop.y && p.y <= crop.y + crop.h) mode = 'move';
+      else mode = null;
+      st = { p:p, c:{ x:crop.x, y:crop.y, w:crop.w, h:crop.h } };
+      if(mode){ cv.setPointerCapture(e.pointerId); e.preventDefault(); }
+    });
+    cv.addEventListener('pointermove', function(e){
+      if(!mode) return; const p = pt(e), dx = p.x - st.p.x, dy = p.y - st.p.y;
+      if(mode === 'move'){
+        crop.x = Math.min(Math.max(0, st.c.x + dx), src.width - crop.w); crop.y = Math.min(Math.max(0, st.c.y + dy), src.height - crop.h);
+      }else{
+        let w = Math.max(40, st.c.w + dx), h = ratio ? w / ratio : Math.max(40, st.c.h + dy);
+        const maxW = src.width - crop.x, maxH = src.height - crop.y;
+        if(w > maxW){ w = maxW; if(ratio) h = w / ratio; } if(h > maxH){ h = maxH; if(ratio) w = h * ratio; }
+        crop.w = w; crop.h = h;
+      }
+      drawCrop();
+    });
+    const end = function(){ mode = null; }; cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  })();
+
+  // ----- crop -> background step -----
+  $('#sr-ph-apply').addEventListener('click', function(){
+    const k = Math.min(1, 1400 / Math.max(crop.w, crop.h));
+    cut = document.createElement('canvas'); cut.width = Math.max(1, Math.round(crop.w * k)); cut.height = Math.max(1, Math.round(crop.h * k));
+    cut.getContext('2d').drawImage(src, crop.x, crop.y, crop.w, crop.h, 0, 0, cut.width, cut.height);
+    $('#sr-ph-bg').style.display = 'block'; paintFills(); render(); $('#sr-ph-bg').scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+  $('#sr-ph-recrop').addEventListener('click', function(){ $('#sr-ph-crop').scrollIntoView({ behavior:'smooth', block:'start' }); });
+  $('#sr-ph-on').addEventListener('change', function(e){ bgOn = e.target.checked; $('#sr-ph-bgopts').style.opacity = bgOn ? 1 : .4; render(); });
+  let timer = null;
+  $('#sr-ph-tol').addEventListener('input', function(e){ tol = +e.target.value; $('#sr-ph-tolv').textContent = tol; clearTimeout(timer); timer = setTimeout(render, 120); });
+
+  // ----- background removal: flood-fill from the photo's border over pixels close to the backdrop colour -----
+  function removeBackground(srcCanvas, tolerance){
+    const w = srcCanvas.width, h = srcCanvas.height, ctx = srcCanvas.getContext('2d');
+    const img = ctx.getImageData(0, 0, w, h), d = img.data, N = w * h;
+    // reference colour = median of the outer frame
+    const rs = [], gs = [], bs = [], add = function(i){ rs.push(d[i*4]); gs.push(d[i*4+1]); bs.push(d[i*4+2]); };
+    for(let x = 0; x < w; x++){ add(x); add((h-1)*w + x); } for(let y = 0; y < h; y++){ add(y*w); add(y*w + w - 1); }
+    const med = function(a){ a.sort(function(p, q){ return p - q; }); return a[a.length >> 1]; };
+    const R = med(rs), G = med(gs), B = med(bs);
+    const dist = function(i, r, g, b){ const dr = d[i*4] - r, dg = d[i*4+1] - g, db = d[i*4+2] - b; return Math.sqrt(dr*dr + dg*dg + db*db); };
+    const seen = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
+    const tryPush = function(i){ if(!seen[i] && dist(i, R, G, B) <= tolerance){ seen[i] = 1; q[qt++] = i; } };
+    for(let x = 0; x < w; x++){ tryPush(x); tryPush((h-1)*w + x); } for(let y = 0; y < h; y++){ tryPush(y*w); tryPush(y*w + w - 1); }
+    const soft = tolerance * 0.3;   // allows slow gradients/shadows in the backdrop
+    while(qh < qt){
+      const i = q[qh++], x = i % w, y = (i / w) | 0, r = d[i*4], g = d[i*4+1], b = d[i*4+2];
+      const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1];
+      for(let k = 0; k < 4; k++){ const j = nb[k]; if(j < 0 || seen[j]) continue;
+        if(dist(j, R, G, B) <= tolerance || dist(j, r, g, b) <= soft){ seen[j] = 1; q[qt++] = j; } }
+    }
+    // alpha: backdrop = 0, subject = 255, then a light blur of the edge for smooth borders
+    const a = new Float32Array(N); for(let i = 0; i < N; i++) a[i] = seen[i] ? 0 : 255;
+    const b2 = new Float32Array(N);
+    for(let pass = 0; pass < 2; pass++){
+      for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+        const i = y * w + x; let s = 0, c = 0;
+        for(let yy = -1; yy <= 1; yy++){ const Y = y + yy; if(Y < 0 || Y >= h) continue; for(let xx = -1; xx <= 1; xx++){ const X = x + xx; if(X < 0 || X >= w) continue; s += a[Y*w + X]; c++; } }
+        b2[i] = s / c;
+      }
+      a.set(b2);
+    }
+    for(let i = 0; i < N; i++) d[i*4+3] = a[i] | 0;
+    ctx.putImageData(img, 0, 0);
+    return srcCanvas;
+  }
+
+  function render(){
+    if(!cut) return;
+    const out = $('#sr-ph-out'); out.width = cut.width; out.height = cut.height;
+    const c = out.getContext('2d'); c.clearRect(0, 0, out.width, out.height);
+    let layer = cut;
+    if(bgOn){ const t = document.createElement('canvas'); t.width = cut.width; t.height = cut.height; t.getContext('2d').drawImage(cut, 0, 0); layer = removeBackground(t, tol); }
+    if(bgOn && bgFill !== 'transparent'){ c.fillStyle = bgFill; c.fillRect(0, 0, out.width, out.height); }
+    c.drawImage(layer, 0, 0);
+    result = { canvas: out, png: !(bgOn && bgFill === 'transparent') ? false : true };
+  }
+  function toBlob(){
+    return new Promise(function(res){
+      const transparent = bgOn && bgFill === 'transparent';
+      $('#sr-ph-out').toBlob(function(b){ res({ blob:b, name: 'photo' + (transparent ? '.png' : '.jpg') }); }, transparent ? 'image/png' : 'image/jpeg', 0.95);
+    });
+  }
+  $('#sr-ph-share').addEventListener('click', async function(){
+    if(!cut) return; const r = await toBlob();
+    const st = await srShareFile(r.blob, r.name, '');
+    if(st === 'downloaded') toast('تم تنزيل الصورة — أرفقها في واتساب أو الإيميل');
+  });
+  $('#sr-ph-dl').addEventListener('click', async function(){
+    if(!cut) return; const r = await toBlob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  });
+}
+
 // MODULE: Service Requests (طلبات الخدمات الحكومية)
 // Digitizes the 5 official RCJY/Ras Al-Khair forms as a guided, step-by-step
 // flow for a representative (مندوب) with no login, routed to an admin inbox.
@@ -5990,7 +6360,9 @@ function renderServiceRequests(root, ctx){
     try{
       const jump = JSON.parse(localStorage.getItem('grrk_sr_jump') || 'null');
       localStorage.removeItem('grrk_sr_jump');
-      if(jump && jump.mode === 'inbox'){
+      if(jump && jump.mode === 'users'){
+        view = 'users';
+      } else if(jump && jump.mode === 'inbox'){
         view = 'inbox';
       } else if(jump && jump.mode === 'form' && SR_FORM_DEFS[jump.form]){
         wizardForm = jump.form;
@@ -6035,12 +6407,14 @@ function renderServiceRequests(root, ctx){
     if(view === 'landing') return paintLanding();
     if(view === 'identify') return paintIdentify();
     if(view === 'employee') return paintEmployee();
+    if(view === 'photo') return srRenderPhotoTool(root, { toast: ctx.showToast, onBack: ()=>{ view='formtype'; paint(); } });
     if(view === 'viewer') return paintViewer();
     if(view === 'register') return paintRegister();
     if(view === 'formtype') return paintFormType();
     if(view === 'wizard') return paintWizard();
     if(view === 'done') return paintDone();
     if(view === 'inbox') return paintInbox();
+    if(view === 'users') return paintUsers();
     if(view === 'config') return paintConfig();
   }
 
@@ -6128,6 +6502,16 @@ function renderServiceRequests(root, ctx){
           <span>${iconArrow()}</span>
         </button>
       </div>
+      <div class="sr-landing-grid" style="margin-top:12px">
+        <button type="button" class="card pressable sr-big-btn" id="sr-go-users">
+          <span class="icon3d" style="--i1:#7FD6A8;--i2:#2E9966">${SR_ICONS.employees}</span>
+          <span class="sr-big-text">
+            <span class="sr-big-title">${isAr?'المستخدمون':'Users'}</span>
+            <span class="sr-big-sub">${isAr?'الموافقة على طلبات التسجيل وإرسال رقم التسجيل':'Approve registrations & send the number'}</span>
+          </span>
+          <span>${iconArrow()}</span>
+        </button>
+      </div>
       <div class="sr-config-link" id="sr-go-config">${isAr?'إعداد الربط':'Connection setup'}</div>
     `;
     root.querySelector('#sr-go-submit').addEventListener('click', ()=>{
@@ -6135,6 +6519,7 @@ function renderServiceRequests(root, ctx){
       paint();
     });
     root.querySelector('#sr-go-inbox').addEventListener('click', ()=>{ view='inbox'; paint(); });
+    root.querySelector('#sr-go-users').addEventListener('click', ()=>{ view='users'; paint(); });
     root.querySelector('#sr-go-config').addEventListener('click', ()=>{ view='config'; paint(); });
   }
 
@@ -6144,8 +6529,8 @@ function renderServiceRequests(root, ctx){
         <div class="eyebrow">${isAr?'تقديم طلب':'Submit a request'}</div>
         <p class="muted" style="margin-top:8px">من أنت؟</p>
         <button class="btn primary block" id="sr-id-emp" style="margin-top:14px">أنا موظف في مدينة رأس الخير</button>
-        <p class="muted" style="margin:16px 0 0">مندوب شركة؟ سجّل مرة واحدة وتحصل على رقمك الخاص.</p>
-        <button class="btn block" id="sr-id-new" style="margin-top:10px">${isAr?'مندوب جديد — سجّل الآن':'New representative — register'}</button>
+        <p class="muted" style="margin:16px 0 0">مستخدم من شركة؟ سجّل مرة واحدة، وبعد موافقة الأدمن تحصل على رقمك الخاص.</p>
+        <button class="btn block" id="sr-id-new" style="margin-top:10px">${isAr?'مستخدم جديد — سجّل الآن':'New user — register'}</button>
       </div>
       <div class="card">
         <div class="eyebrow" style="margin-bottom:10px">${isAr?'لديّ رقم تسجيل':'I have a registration number'}</div>
@@ -6168,7 +6553,7 @@ function renderServiceRequests(root, ctx){
           if(wizardForm){ wizardStep = 0; wizardData = {}; view = 'wizard'; } else { view = 'formtype'; }
           paint();
         }else{
-          ctx.showToast(isAr?'رقم التسجيل غير موجود':'Registration number not found');
+          if(res.error==='pending'){ ctx.showToast('طلب تسجيلك قيد المراجعة من الأدمن — سيصلك رقمك بعد الموافقة'); } else if(res.error==='rejected'){ ctx.showToast('تعذر قبول تسجيلك، تواصل مع الأدمن'); } else { ctx.showToast(isAr?'رقم التسجيل غير موجود':'Registration number not found'); }
           btn.disabled = false; btn.textContent = isAr?'متابعة':'Continue';
         }
       }catch(e){
@@ -6184,7 +6569,7 @@ function renderServiceRequests(root, ctx){
     root.innerHTML = `
       <div class="glass" style="margin-bottom:16px">
         <div class="eyebrow">موظف مدينة رأس الخير</div>
-        <p class="muted" style="margin-top:8px">بياناتك مرة واحدة فقط — بدون تسجيل مندوب.</p>
+        <p class="muted" style="margin-top:8px">بياناتك مرة واحدة فقط — بدون تسجيل.</p>
       </div>
       <div class="card">
         <div class="field"><label>الاسم</label><input type="text" id="sr-e-name"></div>
@@ -6192,7 +6577,7 @@ function renderServiceRequests(root, ctx){
         <div class="field"><label>رقم الجوال</label><input type="tel" id="sr-e-phone" dir="ltr"></div>
         <div class="field"><label>البريد الإلكتروني (لإشعارك بالاعتماد)</label><input type="email" id="sr-e-email" dir="ltr"></div>
         <button class="btn primary block" id="sr-e-go">متابعة</button>
-        <button class="btn ghost block" id="sr-e-rep" style="margin-top:10px">أنا مندوب شركة</button>
+        <button class="btn ghost block" id="sr-e-rep" style="margin-top:10px">أنا مستخدم من شركة</button>
       </div>
     `;
     root.querySelector('#sr-e-rep').addEventListener('click', ()=>{ view='identify'; paint(); });
@@ -6233,6 +6618,17 @@ function renderServiceRequests(root, ctx){
       btn.disabled = true; btn.textContent = isAr?'جار التسجيل...':'Registering...';
       try{
         const res = await srApiPost(cfg.url, { token:cfg.token, action:'register_rep', name, company, phone, email });
+        if(res.ok && res.pending){
+          root.innerHTML = `
+            <div class="glass" style="text-align:center">
+              <div class="sr-done-icon">${iconCheck()}</div>
+              <div class="h2">تم استلام طلب التسجيل</div>
+              <p class="muted" style="margin:10px 0 16px">طلبك بانتظار موافقة الأدمن. بعد الموافقة يصلك رقم التسجيل الخاص بك عبر واتساب أو الإيميل، وتدخل به لتقديم الطلبات.</p>
+              <button class="btn block" id="sr-r-home">رجوع</button>
+            </div>`;
+          root.querySelector('#sr-r-home').addEventListener('click', ()=>{ view='identify'; paint(); });
+          return;
+        }
         if(res.ok){
           session = { rep_id:res.rep_id, name, company };
           srSaveSession(session);
@@ -6280,6 +6676,10 @@ function renderServiceRequests(root, ctx){
           `;
         }).join('')}
       </div>
+      <button type="button" class="card pressable sr-formtype-card" id="sr-ft-photo" style="margin-top:12px;width:100%">
+        <span class="icon3d" style="--i1:#6FD0E8;--i2:#1F7C95">${SR_ICONS.employees}</span>
+        <span class="sr-ft-label">أداة الصور — قص وإزالة الخلفية وإرسالها</span>
+      </button>
       <button class="btn ghost block" id="sr-ft-switch" style="margin-top:16px">${isAr?'لست أنا — تبديل الحساب':"Not me — switch account"}</button>
     `;
     root.querySelectorAll('[data-form]').forEach(btn=>{
@@ -6291,6 +6691,7 @@ function renderServiceRequests(root, ctx){
         paint();
       });
     });
+    root.querySelector('#sr-ft-photo').addEventListener('click', ()=>{ view='photo'; paint(); });
     root.querySelector('#sr-ft-switch').addEventListener('click', ()=>{
       srClearSession(); session = null; view = 'identify'; paint();
     });
@@ -6491,7 +6892,7 @@ function renderServiceRequests(root, ctx){
           view = 'done';
           paint();
         }else{
-          ctx.showToast('تعذر إرسال الطلب');
+          if(res.error==='rep_not_approved'){ ctx.showToast('تسجيلك لم يُعتمد بعد من الأدمن'); } else { ctx.showToast('تعذر إرسال الطلب'); }
           btn.disabled = false; btn.textContent = 'إرسال الطلب';
         }
       }catch(e){
@@ -6566,6 +6967,102 @@ function renderServiceRequests(root, ctx){
     }
   }
 
+
+  // ---- Share panel: ready-to-send message (WhatsApp / e-mail / PDF) for the admin to forward to the user ----
+  function openSharePanel(o){
+    const wa = o.phone ? srWaLink(o.phone, o.text) : '';
+    const ml = o.email ? srMailLink(o.email, o.subject || '', o.text) : '';
+    const btnCss = 'display:block;text-align:center;text-decoration:none;margin-top:10px';
+    const html = `
+      <div class="glass">
+        <div class="eyebrow">${esc(o.title)}</div>
+        <pre style="white-space:pre-wrap;font-family:inherit;margin:12px 0;line-height:1.8">${esc(o.text)}</pre>
+        ${wa ? `<a class="btn primary block" id="sr-sh-wa" href="${esc(wa)}" target="_blank" rel="noopener" style="${btnCss}">إرسال عبر واتساب</a>` : '<div class="muted">لا يوجد رقم جوال لهذا المستخدم</div>'}
+        ${ml ? `<a class="btn block" id="sr-sh-mail" href="${esc(ml)}" style="${btnCss}">إرسال بالإيميل</a>` : ''}
+        ${o.pdfMaker ? `<button class="btn block" id="sr-sh-pdf" style="margin-top:10px">📎 مشاركة ملف PDF (واتساب / إيميل)</button>` : ''}
+        <button class="btn ghost block" id="sr-sh-close" style="margin-top:10px">إغلاق</button>
+      </div>`;
+    ctx.openOverlay(html, (el)=>{
+      el.querySelector('#sr-sh-close').addEventListener('click', ()=> ctx.closeOverlay());
+      const pb = el.querySelector('#sr-sh-pdf');
+      if(pb) pb.addEventListener('click', async ()=>{
+        pb.disabled = true; const t0 = pb.textContent; pb.textContent = 'جار تجهيز الملف...';
+        try{
+          const blob = await o.pdfMaker();
+          const r = await srShareFile(blob, o.pdfName || 'document.pdf', o.text);
+          if(r === 'downloaded') ctx.showToast('تم تنزيل الملف — أرفقه في واتساب أو الإيميل');
+        }catch(e){ ctx.showToast('تعذر تجهيز الملف'); }
+        pb.disabled = false; pb.textContent = t0;
+      });
+    });
+  }
+
+  function userShareMessage(rep){
+    const link = new URL('../request/', location.href).href;
+    return 'أهلاً ' + rep.name + '،\nتمت الموافقة على تسجيلك كمستخدم في نظام طلبات العلاقات الحكومية — مدينة رأس الخير للصناعات التعدينية.\n\nرقم التسجيل الخاص بك: ' + rep.rep_id + '\nاحتفظ به، تحتاجه عند تقديم أي طلب.\n\nرابط تقديم الطلبات:\n' + link;
+  }
+  function shareApprovedUser(rep){
+    openSharePanel({
+      title: 'تمت الموافقة — أرسل الرقم للمستخدم', phone: rep.phone, email: rep.email,
+      subject: 'تم قبول تسجيلك — رقمك ' + rep.rep_id, text: userShareMessage(rep),
+      pdfName: 'قبول-تسجيل-' + rep.rep_id + '.pdf',
+      pdfMaker: ()=> srRegistrationLetterPdf(rep, { stampSrc: srDefaultStamp(), link: new URL('../request/', location.href).href })
+    });
+  }
+
+  async function paintUsers(){
+    root.innerHTML = `
+      <div class="glass" style="margin-bottom:14px">
+        <div class="eyebrow">${isAr?'المستخدمون':'Users'}</div>
+        <p class="muted" style="margin-top:8px">${isAr?'وافق على طلبات التسجيل الجديدة، ثم أرسل رقم التسجيل للمستخدم بالواتساب أو الإيميل.':'Approve new registrations, then send the number to the user.'}</p>
+      </div>
+      <div class="sr-loading" id="sr-users-loading">${isAr?'جار التحميل...':'Loading...'}</div>
+      <button class="btn ghost block" id="sr-users-back" style="margin-top:14px">${isAr?'رجوع':'Back'}</button>
+    `;
+    root.querySelector('#sr-users-back').addEventListener('click', ()=>{ view='landing'; paint(); });
+    const ld = ()=> root.querySelector('#sr-users-loading');
+    try{
+      const res = await srApiGet(cfg.url, { token:cfg.token, admin_token:cfg.adminToken||'', action:'list_reps' });
+      if(!res.ok){
+        ld().textContent = res.error==='admin_only' ? 'مفتاح الأدمن غير صحيح'
+          : res.error==='unknown_action' ? 'هذه الميزة تحتاج تحديث الخلفية (Code.gs الإصدار 2.1)' : 'تعذر التحميل';
+        return;
+      }
+      const reps = (res.reps||[]).slice().sort((a,b)=>{
+        const pa = a.status==='قيد المراجعة' ? 0 : 1, pb = b.status==='قيد المراجعة' ? 0 : 1;
+        return pa - pb || String(b.rep_id).localeCompare(String(a.rep_id));
+      });
+      if(!reps.length){ ld().outerHTML = `<div class="empty">لا يوجد مستخدمون بعد</div>`; return; }
+      ld().outerHTML = `<div style="display:flex;flex-direction:column;gap:10px">` + reps.map((u,i)=>{
+        const st = u.status || 'معتمد';
+        return `<div class="card" data-u="${i}" style="padding:14px">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+            <b>${esc(u.name)}</b><span class="badge ${statusClass(st)}">${esc(SR_STATUS_LABEL[st]||st)}</span>
+          </div>
+          <div class="muted" style="margin-top:6px;line-height:1.7">${esc(u.company||'-')} · <span dir="ltr">${esc(u.phone||'-')}</span><br>${esc(u.email||'')} <span dir="ltr">${esc(u.rep_id)}</span></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            ${st==='قيد المراجعة' ? `<button class="btn danger" data-act="rej">رفض</button><button class="btn primary" data-act="ok">قبول</button>` : ''}
+            ${st==='معتمد' ? `<button class="btn" data-act="share">إرسال الرقم</button>` : ''}
+          </div></div>`;
+      }).join('') + `</div>`;
+      root.querySelectorAll('[data-u]').forEach(card=>{
+        const u = reps[+card.getAttribute('data-u')];
+        card.querySelectorAll('[data-act]').forEach(b=> b.addEventListener('click', async ()=>{
+          const act = b.getAttribute('data-act');
+          if(act === 'share'){ shareApprovedUser(u); return; }
+          b.disabled = true;
+          try{
+            const r = await srApiPost(cfg.url, { token:cfg.token, admin_token:cfg.adminToken, action:'update_rep', rep_id:u.rep_id, new_status: act==='ok' ? 'معتمد' : 'مرفوض' });
+            if(r.ok){
+              ctx.showToast(act==='ok' ? 'تمت الموافقة' : 'تم الرفض');
+              if(act==='ok'){ await paintUsers(); shareApprovedUser(Object.assign({}, u, r.rep||{})); } else { paintUsers(); }
+            }else{ ctx.showToast(r.error==='admin_only' ? 'مفتاح الأدمن غير صحيح' : 'تعذر التحديث'); b.disabled = false; }
+          }catch(e){ ctx.showToast('تعذر الاتصال'); b.disabled = false; }
+        }));
+      });
+    }catch(e){ console.error('users:', e); ld().textContent = 'تعذر الاتصال'; }
+  }
+
   function srLabelMap(def){
     const m = {};
     if(def) def.steps.forEach(st=> st.fields.forEach(f=>{ m[f.key] = f.labelAr; }));
@@ -6628,7 +7125,7 @@ function renderServiceRequests(root, ctx){
         ${visitorsHtml}
         <div class="sr-detail-row"><span class="k">${isAr?'الحالة':'Status'}</span><span class="v"><span class="badge ${statusClass(r.status)}">${esc(SR_STATUS_LABEL[r.status]||r.status)}</span></span></div>
         ${pending ? `
-          <div class="field" style="margin-top:12px"><label>${isAr?'ملاحظة (اختياري — تصل للمندوب بالإيميل)':'Note (optional — emailed to the representative)'}</label><textarea id="sr-note" rows="2"></textarea></div>
+          <div class="field" style="margin-top:12px"><label>${isAr?'ملاحظة (اختياري — تصل للمستخدم بالإيميل)':'Note (optional — emailed to the user)'}</label><textarea id="sr-note" rows="2"></textarea></div>
           <div class="sr-wizard-actions">
             <button class="btn danger" id="sr-reject-btn">${isAr?'رفض':'Reject'}</button>
             <button class="btn primary" id="sr-approve-btn">${isAr?'اعتماد':'Approve'}</button>
@@ -6654,6 +7151,13 @@ function renderServiceRequests(root, ctx){
             ctx.closeOverlay();
             if(newStatus==='معتمد'){ r.status='معتمد'; r.notes=note.trim(); }
             paintInbox();
+            if(r.submitter_phone || r.submitter_email){
+              const permitNo = (newStatus==='معتمد' && r.form_type==='entry_permit') ? srPermitNumber(r) : '';
+              const txt = newStatus==='معتمد'
+                ? 'السلام عليكم ' + (r.submitter_name||'') + '،\nتم اعتماد طلبكم (' + label + ')' + (permitNo ? '\nرقم التصريح: ' + permitNo : '') + (note.trim() ? '\nملاحظة: ' + note.trim() : '') + '\nيمكنكم الدخول إلى النظام لطباعة النموذج المعتمد.'
+                : 'السلام عليكم ' + (r.submitter_name||'') + '،\nنأسف، لم يتم اعتماد طلبكم (' + label + ')\nالسبب: ' + note.trim();
+              setTimeout(()=> openSharePanel({ title: newStatus==='معتمد' ? 'أرسل الاعتماد للمستخدم' : 'أرسل الرفض للمستخدم', phone: r.submitter_phone, email: r.submitter_email, subject: 'بخصوص طلبكم: ' + label, text: txt }), 150);
+            }
           }else{
             ctx.showToast(res.error==='admin_only' ? (isAr?'مفتاح الأدمن غير صحيح':'Wrong admin key') : (isAr?'تعذر التحديث':'Update failed'));
           }

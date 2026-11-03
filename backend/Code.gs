@@ -21,6 +21,13 @@ const SHARED_TOKEN = 'CHANGE_ME_SHARED';
 // مفتاح الأدمن: يُكتب مرة واحدة داخل جوالك فقط، ولا يوجد في صفحة المناديب
 const ADMIN_TOKEN = 'CHANGE_ME_ADMIN';
 
+// بريد الأدمن لاستقبال تنبيهات (تسجيل جديد / طلب جديد). اتركه فارغًا لتعطيله.
+const ADMIN_EMAIL = '';
+// واتساب الأدمن (اختياري، مجاني عبر CallMeBot): الرقم بصيغة دولية بدون + مثل 9665XXXXXXXX
+// وطريقة الحصول على المفتاح: أرسل من واتساب الرسالة  I allow callmebot to send me messages  إلى الرقم +34 644 51 95 23
+const ADMIN_WHATSAPP = '';
+const CALLMEBOT_KEY = '';
+
 const SHEET_REQUESTS = 'Requests';
 const SHEET_ROUTING = 'RoutingRules';
 const SHEET_REPS = 'Representatives';
@@ -32,7 +39,22 @@ const REQUEST_HEADERS = [
   'last_updated', 'notes'
 ];
 
-const REP_HEADERS = ['rep_id', 'name', 'company', 'phone', 'email', 'registered_at'];
+const REP_HEADERS = ['rep_id', 'name', 'company', 'phone', 'email', 'registered_at', 'status'];
+const REP_PENDING = 'قيد المراجعة', REP_APPROVED = 'معتمد', REP_REJECTED = 'مرفوض';
+
+function notifyAdmin_(subject, text){
+  try{ if(ADMIN_EMAIL) MailApp.sendEmail({ to: ADMIN_EMAIL, subject: subject, body: text }); }catch(e){}
+  try{
+    if(ADMIN_WHATSAPP && CALLMEBOT_KEY){
+      UrlFetchApp.fetch('https://api.callmebot.com/whatsapp.php?phone=' + encodeURIComponent(ADMIN_WHATSAPP) +
+        '&text=' + encodeURIComponent(subject + '\n' + text) + '&apikey=' + encodeURIComponent(CALLMEBOT_KEY), { muteHttpExceptions:true });
+    }
+  }catch(e){}
+}
+
+function ensureRepStatusCol_(sh){
+  if (sh.getLastColumn() < 7) sh.getRange(1, 7).setValue('status');
+}
 
 function nextRepId_(sh){
   const rows = sh.getDataRange().getValues();
@@ -46,18 +68,32 @@ function nextRepId_(sh){
 
 function registerRep_(body){
   const sh = getSheet_(SHEET_REPS, REP_HEADERS);
+  ensureRepStatusCol_(sh);
   const repId = nextRepId_(sh);
-  sh.appendRow([repId, body.name || '', body.company || '', body.phone || '', body.email || '', new Date()]);
-  try{
-    if(body.email){
-      MailApp.sendEmail({
-        to: body.email,
-        subject: 'رقم تسجيلك في GRRK: ' + repId,
-        body: 'أهلاً ' + (body.name || '') + '،\n\nرقم تسجيلك الخاص هو: ' + repId + '\n\nاحفظه، تحتاجه في كل مرة تقدّم فيها طلب جديد.'
-      });
+  sh.appendRow([repId, body.name || '', body.company || '', body.phone || '', body.email || '', new Date(), REP_PENDING]);
+  notifyAdmin_('طلب تسجيل مستخدم جديد', 'الاسم: ' + (body.name || '') + '\nالجهة: ' + (body.company || '-') + '\nالجوال: ' + (body.phone || '-') + '\nالرقم المبدئي: ' + repId + '\n\nافتح تطبيق الأدمن ← المستخدمون للموافقة أو الرفض.');
+  return jsonOut_({ ok:true, rep_id: repId, pending:true });
+}
+
+function setRepStatus_(body){
+  const sh = getSheet_(SHEET_REPS, REP_HEADERS);
+  ensureRepStatusCol_(sh);
+  const rows = sh.getDataRange().getValues();
+  const status = body.new_status === REP_APPROVED ? REP_APPROVED : REP_REJECTED;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim().toUpperCase() === String(body.rep_id || '').trim().toUpperCase()) {
+      sh.getRange(i + 1, 7).setValue(status);
+      const rep = { rep_id: rows[i][0], name: rows[i][1], company: rows[i][2], phone: rows[i][3], email: rows[i][4], status: status };
+      if (status === REP_APPROVED && rep.email) {
+        try{
+          MailApp.sendEmail({ to: rep.email, subject: 'تم قبول تسجيلك في GRRK — رقمك: ' + rep.rep_id,
+            body: 'أهلاً ' + rep.name + '،\n\nتمت الموافقة على تسجيلك كمستخدم.\nرقم التسجيل الخاص بك: ' + rep.rep_id + '\n\nاحفظه، تحتاجه في كل مرة تقدّم فيها طلبًا جديدًا.' });
+        }catch(e){}
+      }
+      return jsonOut_({ ok:true, rep: rep });
     }
-  }catch(e){}
-  return jsonOut_({ ok:true, rep_id: repId });
+  }
+  return jsonOut_({ ok:false, error:'not_found' });
 }
 
 function findRep_(repId){
@@ -65,7 +101,7 @@ function findRep_(repId){
   const rows = sh.getDataRange().getValues();
   for(let i=1;i<rows.length;i++){
     if(String(rows[i][0]).trim().toUpperCase() === String(repId).trim().toUpperCase()){
-      return { rep_id: rows[i][0], name: rows[i][1], company: rows[i][2], phone: rows[i][3], email: rows[i][4] };
+      return { rep_id: rows[i][0], name: rows[i][1], company: rows[i][2], phone: rows[i][3], email: rows[i][4], status: String(rows[i][6] || REP_APPROVED) };
     }
   }
   return null;
@@ -114,6 +150,10 @@ function doPost(e) {
       if (body.admin_token !== ADMIN_TOKEN) return jsonOut_({ ok: false, error: 'admin_only' });
       return updateStatus_(body);
     }
+    if (body.action === 'update_rep') {
+      if (body.admin_token !== ADMIN_TOKEN) return jsonOut_({ ok: false, error: 'admin_only' });
+      return withLock_(function(){ return setRepStatus_(body); });
+    }
     if (body.action === 'register_rep') {
       return withLock_(function(){ return registerRep_(body); });
     }
@@ -128,6 +168,7 @@ function createRequest_(body) {
   const sh = getSheet_(SHEET_REQUESTS, REQUEST_HEADERS);
   const routing = findRouting_(body.form_type);
   const rep = body.rep_id ? findRep_(body.rep_id) : null;
+  if (rep && rep.status !== REP_APPROVED) return jsonOut_({ ok:false, error:'rep_not_approved' });
   const id = body.form_type + '-' + Utilities.formatDate(new Date(), 'Asia/Riyadh', 'yyMMdd-HHmmss') + '-' + Math.floor(Math.random()*90+10);
   const now = new Date();
 
@@ -152,6 +193,8 @@ function createRequest_(body) {
     now,
     ''
   ]);
+
+  notifyAdmin_('طلب جديد — ' + ((routing && routing.label) || body.form_type), 'مقدّم الطلب: ' + submitterName + '\nالجهة: ' + (company || '-') + '\nالجوال: ' + (submitterPhone || '-') + '\nرقم الطلب: ' + id);
 
   if (routing && routing.email) {
     try {
@@ -219,13 +262,16 @@ function doGet(e) {
 
   if (params.action === 'get_rep') {
     const rep = findRep_(params.rep_id || '');
-    return rep ? jsonOut_({ ok: true, rep: { rep_id: rep.rep_id, name: rep.name, company: rep.company } }) : jsonOut_({ ok: false, error: 'not_found' });
+    if (!rep) return jsonOut_({ ok: false, error: 'not_found' });
+    if (rep.status === REP_PENDING) return jsonOut_({ ok: false, error: 'pending' });
+    if (rep.status === REP_REJECTED) return jsonOut_({ ok: false, error: 'rejected' });
+    return jsonOut_({ ok: true, rep: { rep_id: rep.rep_id, name: rep.name, company: rep.company } });
   }
 
   if (params.action === 'list_reps') {
     if (params.admin_token !== ADMIN_TOKEN) return jsonOut_({ ok: false, error: 'admin_only' });
     const rs = getSheet_(SHEET_REPS, REP_HEADERS).getDataRange().getValues();
-    const reps = rs.slice(1).map(r => ({ rep_id: r[0], name: r[1], company: r[2], phone: r[3], email: r[4], registered_at: r[5] }));
+    const reps = rs.slice(1).map(r => ({ rep_id: r[0], name: r[1], company: r[2], phone: r[3], email: r[4], registered_at: r[5], status: String(r[6] || REP_APPROVED) }));
     return jsonOut_({ ok: true, reps: reps });
   }
 

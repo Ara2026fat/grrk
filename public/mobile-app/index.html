@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-11-01T11:10:37Z', dmy: '01/11/2026', hm: '14:10' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T05:40:38Z', dmy: '03/11/2026', hm: '08:40' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5583,7 +5583,7 @@ function srToday(){ return new Date().toLocaleDateString('ar-SA-u-ca-gregory'); 
 
 function srFitOverlays(root){ if(window.CSS && CSS.supports && CSS.supports('width','1cqw')) return; (root||document).querySelectorAll('.op').forEach(function(o){ var i=o.querySelector('.oi'); if(i) i.style.fontSize = (o.clientWidth/100) + 'px'; }); }
 function srOpenPrintDoc(title, bodyHtml, extraCss){
-  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + srEsc(title) + '</title><style>' + SR_PRINT_CSS + (extraCss||'') + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button> <button onclick="srBack()" style="margin-inline-start:10px;background:#dbe4ff">↩ رجوع للتطبيق</button></div><script>function srBack(){ try{ window.close(); }catch(e){} setTimeout(function(){ if(window.opener){ try{ window.opener.focus(); }catch(e){} } else { history.back(); } },150); }function srFit(){ if(window.CSS&&CSS.supports&&CSS.supports("width","1cqw")) return; document.querySelectorAll(".op").forEach(function(o){ var i=o.querySelector(".oi"); if(i) i.style.fontSize=(o.clientWidth/100)+"px"; }); } window.addEventListener("load",srFit); window.addEventListener("resize",srFit); window.addEventListener("beforeprint",srFit); window.addEventListener("afterprint",srFit);<\/script><div class="doc">' + bodyHtml + '</div></body></html>';
+  const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + srEsc(title) + '</title><style>' + SR_PRINT_CSS + (extraCss||'') + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button> <button onclick="srBack()" style="margin-inline-start:10px;background:#dbe4ff">↩ رجوع للتطبيق</button></div><script>function srBack(){ try{ window.close(); }catch(e){} setTimeout(function(){ if(window.opener){ try{ window.opener.focus(); }catch(e){} } else { history.back(); } },150); }function srFit(){ if(window.CSS&&CSS.supports&&CSS.supports("width","1cqw")) return; document.querySelectorAll(".op").forEach(function(o){ var i=o.querySelector(".oi"); if(i) i.style.fontSize=(o.clientWidth/100)+"px"; }); } window.addEventListener("load",srFit); window.addEventListener("resize",srFit); window.addEventListener("beforeprint",srFit); window.addEventListener("afterprint",srFit); function srOne(on){ var d=document.querySelector(".doc"); if(!d||d.querySelector(".op")) return; d.style.zoom=1; if(on){ var h=d.scrollHeight, max=1020; if(h>max) d.style.zoom=(max/h).toFixed(3); } } window.addEventListener("beforeprint",function(){srOne(true)}); window.addEventListener("afterprint",function(){srOne(false)});<\/script><div class="doc">' + bodyHtml + '</div></body></html>';
   const w = window.open('', '_blank');
   if(w){ w.document.open(); w.document.write(html); w.document.close(); return true; }
   const old = document.getElementById('sr-print'); if(old) old.remove();
@@ -5693,7 +5693,7 @@ function srPrintLoss(d, opts){
   c(790, 1198, d.holderName);
   if(opts.stampSrc) it.push(['s', 300, 1306, 170, opts.stampSrc]);
   const bg = srAbs('../request/forms/loss_report-1.jpg');
-  return srOpenPrintDoc('بلاغ فقدان', srOverlayPage(bg, 1241, 1754, it, 100), SR_OVERLAY_CSS);
+  return srOpenPrintDoc('بلاغ فقدان', srOverlayPage(bg, 1241, 1754, it, 94), SR_OVERLAY_CSS);
 }
 
 // "طلب إصدار بطاقة" — original form (page 1 = form, page 2 = instructions), 1152x1778 backgrounds.
@@ -5872,7 +5872,7 @@ const SR_FORM_DEFS = {
     ],
   },
   badge: {
-    labelAr:'طلب إصدار بطاقة', labelEn:'Badge Request', icon:'employees', i1:'#7FD6A8', i2:'#2E9966',
+    blankFile:'badge.pdf', labelAr:'طلب إصدار بطاقة', labelEn:'Badge Request', icon:'employees', i1:'#7FD6A8', i2:'#2E9966',
     steps: [
       { titleAr:'جهة مقدم الطلب', fields:[
         { key:'entityType', type:'select', labelAr:'الجهة', options:['مدينة رأس الخير للصناعات التعدينية','جهة حكومية','شركة / مؤسسة'] },
@@ -5903,7 +5903,7 @@ const SR_FORM_DEFS = {
     ],
   },
   loss_report: {
-    labelAr:'بلاغ فقدان', labelEn:'Loss Report', icon:'alerts', i1:'#FFC168', i2:'#B4790F',
+    blankFile:'loss_report.pdf', labelAr:'بلاغ فقدان', labelEn:'Loss Report', icon:'alerts', i1:'#FFC168', i2:'#B4790F',
     steps: [
       { titleAr:'ما الذي فُقد؟', fields:[
         { key:'lostItemType', type:'select', labelAr:'نوع المفقود', options:['بطاقة','تصريح مركبة'] },
@@ -5932,7 +5932,7 @@ const SR_FORM_DEFS = {
     ],
   },
   visit_request: {
-    labelAr:'طلب زيارة', labelEn:'Visit Request', icon:'visitors', i1:'#E0A86F', i2:'#A86F2E',
+    blankFile:'visit_request.docx', labelAr:'طلب زيارة', labelEn:'Visit Request', icon:'visitors', i1:'#E0A86F', i2:'#A86F2E',
     steps: [
       { titleAr:'بيانات الجهة المستضيفة', fields:[
         { key:'hostEntityName', type:'text', labelAr:'اسم الجهة' },
@@ -5952,7 +5952,7 @@ const SR_FORM_DEFS = {
     ],
   },
   entry_permit: {
-    labelAr:'طلب تصريح دخول أفراد', labelEn:'Personnel Entry Permit Request', icon:'employees', i1:'#9B7BFF', i2:'#5B34C9',
+    blankFile:'entry_permit.docx', labelAr:'طلب تصريح دخول أفراد', labelEn:'Personnel Entry Permit Request', icon:'employees', i1:'#9B7BFF', i2:'#5B34C9',
     steps: [
       { titleAr:'جهة العمل', fields:[
         { key:'employerName', type:'text', labelAr:'يعمل لدى (اسم الشركة / الجهة)' },
@@ -6440,6 +6440,7 @@ function renderServiceRequests(root, ctx){
         ${submitterRowsHtml()}
         <div id="sr-pv-table"></div>
       </div>
+      ${def.blankFile ? `<a class="btn block" id="sr-dl-blank" href="${SR_FORMS_BASE}${def.blankFile}" download style="margin-top:10px;display:block;text-align:center;text-decoration:none">⬇ تحميل النموذج الأصلي (فارغ)</a>` : ''}
       <div class="glass" style="margin-top:14px">
         <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>
         <p class="muted" style="text-align:center;margin:6px 0 0">${wizardForm==='visit_request' ? 'مدة تصريح الزائر: 3 أيام كحد أقصى (72 ساعة).' : wizardForm==='entry_permit' ? 'مدة تصريح دخول الأفراد: 14 يومًا كحد أقصى (أسبوعان).' : 'عبّئ الحقول وسيظهر الشكل الرسمي في الأعلى مباشرة.'}</p>

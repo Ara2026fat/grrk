@@ -376,7 +376,7 @@ h2,.h2{font-family:var(--display); font-weight:600; font-size:19px}
   </div>
   <script>
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T05:40:38Z', dmy: '03/11/2026', hm: '08:40' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T08:58:47Z', dmy: '03/11/2026', hm: '11:58' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5713,7 +5713,7 @@ function srPrintBadge(d, opts){
   tick(d.cardType === 'بطاقة رجل أمن', 1032, 900); tick(d.cardType === 'بطاقة موظفي مدينة رأس الخير', 780, 900); tick(d.cardType === 'بطاقة الشركات', 417, 900);
   if(opts.stampSrc) it.push(['s', 135, 1212, 100, opts.stampSrc]);
   const b1 = srAbs('../request/forms/badge_form-1.jpg'), b2 = srAbs('../request/forms/badge_form-2.jpg');
-  const body = '<div class="opb">' + srOverlayPage(b1, 1152, 1778, it, 91) + '</div>' + srOverlayPage(b2, 1152, 1778, [], 91);
+  const body = srOverlayPage(b1, 1152, 1778, it, 91);
   return srOpenPrintDoc('طلب إصدار بطاقة', body, SR_OVERLAY_CSS);
 }
 
@@ -6440,6 +6440,7 @@ function renderServiceRequests(root, ctx){
         ${submitterRowsHtml()}
         <div id="sr-pv-table"></div>
       </div>
+      ${wizardForm==='badge' ? `<details class="glass" id="sr-ins" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700;text-align:center">📋 تعليمات هامة يجب التقيد بها (للقراءة فقط — لا تُطبع)</summary><img src="${SR_FORMS_BASE}badge_form-2.jpg" alt="" style="width:100%;margin-top:10px;border-radius:8px"></details>` : ''}
       ${def.blankFile ? `<a class="btn block" id="sr-dl-blank" href="${SR_FORMS_BASE}${def.blankFile}" download style="margin-top:10px;display:block;text-align:center;text-decoration:none">⬇ تحميل النموذج الأصلي (فارغ)</a>` : ''}
       <div class="glass" style="margin-top:14px">
         <div class="eyebrow" style="text-align:center">${esc(def.labelAr)}</div>

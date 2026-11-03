@@ -402,7 +402,7 @@ function grrkStretch(pw){ const S = 'grrk-admin-v1'; let h = grrkSha256(S + pw);
 
 (function(){
   if(typeof document === 'undefined') return;           // build-time hashing in Node
-  const HASH = '79d3162fd65f869bd574c9892471fdfef7d9bcf197eed1bea0d186c527a7434e', KEY = 'grrk_admin_unlock', FAIL = 'grrk_admin_fail';
+  const HASH = '85e835859c0cb2be7d686d910ec8d6dc87a63dd3cc45505cf55ef782c5a78d44', KEY = 'grrk_admin_unlock', FAIL = 'grrk_admin_fail';
   try{ if(localStorage.getItem(KEY) === HASH) return; }catch(e){}
   const st = document.createElement('style');
   st.textContent = 'html.grrk-locked body > *:not(#grrk-lock){ visibility:hidden !important } #grrk-lock{ position:fixed; inset:0; z-index:2147483647; background:linear-gradient(160deg,#071a45,#0b2a6b 60%,#17348a); display:flex; align-items:center; justify-content:center; font-family:Tahoma,Arial,sans-serif; direction:rtl; color:#fff } #grrk-lock .b{ width:min(360px,90vw); text-align:center } #grrk-lock img{ width:84px; height:84px; border-radius:20px; margin-bottom:14px } #grrk-lock input{ width:100%; box-sizing:border-box; padding:14px; border-radius:12px; border:0; font-size:18px; text-align:center; margin-top:14px; direction:ltr } #grrk-lock button{ width:100%; margin-top:12px; padding:14px; border:0; border-radius:12px; background:#fff; color:#0b2a6b; font-weight:700; font-size:17px } #grrk-lock .m{ min-height:22px; margin-top:12px; color:#ffb4b4; font-size:14px }';
@@ -433,7 +433,7 @@ function grrkStretch(pw){ const S = 'grrk-admin-v1'; let h = grrkSha256(S + pw);
   setTimeout(function(){ try{ pw.focus(); }catch(e){} }, 100);
 })();
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T14:35:52Z', dmy: '03/11/2026', hm: '17:35' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T15:05:25Z', dmy: '03/11/2026', hm: '18:05' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.

@@ -433,7 +433,7 @@ function grrkStretch(pw){ const S = 'grrk-admin-v1'; let h = grrkSha256(S + pw);
   setTimeout(function(){ try{ pw.focus(); }catch(e){} }, 100);
 })();
 
-const BUILD_STAMP = { version: '1.0', iso: '2026-11-03T15:05:25Z', dmy: '03/11/2026', hm: '18:05' };
+const BUILD_STAMP = { version: '1.0', iso: '2026-11-04T06:14:35Z', dmy: '04/11/2026', hm: '09:14' };
 /* ============================================================
    GRRK — Data Layer (localStorage, no backend)
    Single source of truth all modules read/write through.
@@ -5645,6 +5645,7 @@ function srToday(){ return new Date().toLocaleDateString('ar-SA-u-ca-gregory'); 
 
 function srFitOverlays(root){ if(window.CSS && CSS.supports && CSS.supports('width','1cqw')) return; (root||document).querySelectorAll('.op').forEach(function(o){ var i=o.querySelector('.oi'); if(i) i.style.fontSize = (o.clientWidth/100) + 'px'; }); }
 function srOpenPrintDoc(title, bodyHtml, extraCss){
+  if(window.__srCapture){ window.__srCapture({ title:title, bodyHtml:bodyHtml, extraCss:extraCss||'' }); return true; }
   const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + srEsc(title) + '</title><style>' + SR_PRINT_CSS + (extraCss||'') + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button> <button onclick="srBack()" style="margin-inline-start:10px;background:#dbe4ff">↩ رجوع للتطبيق</button></div><script>function srBack(){ try{ window.close(); }catch(e){} setTimeout(function(){ if(window.opener){ try{ window.opener.focus(); }catch(e){} } else { history.back(); } },150); }function srFit(){ if(window.CSS&&CSS.supports&&CSS.supports("width","1cqw")) return; document.querySelectorAll(".op").forEach(function(o){ var i=o.querySelector(".oi"); if(i) i.style.fontSize=(o.clientWidth/100)+"px"; }); } window.addEventListener("load",srFit); window.addEventListener("resize",srFit); window.addEventListener("beforeprint",srFit); window.addEventListener("afterprint",srFit); function srOne(on){ var d=document.querySelector(".doc"); if(!d||d.querySelector(".op")) return; d.style.zoom=1; if(on){ var h=d.scrollHeight, max=1020; if(h>max) d.style.zoom=(max/h).toFixed(3); } } window.addEventListener("beforeprint",function(){srOne(true)}); window.addEventListener("afterprint",function(){srOne(false)});<\/script><div class="doc">' + bodyHtml + '</div></body></html>';
   const w = window.open('', '_blank');
   if(w){ w.document.open(); w.document.write(html); w.document.close(); return true; }
@@ -5725,6 +5726,7 @@ function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, titl
 const SR_OVERLAY_CSS = '@page{ size:A4; margin:0 } @media print{ .doc{ padding:0!important } } .op{ position:relative; margin:0 auto; line-height:1; container-type:inline-size } .op .oi{ position:absolute; left:0; top:0; width:100%; height:100%; font-size:1cqw } .op img.bg{ width:100%; display:block } .op .t{ position:absolute; white-space:nowrap; font-weight:700; color:#0b1f4d; font-family:Tahoma,Arial,sans-serif; unicode-bidi:plaintext } .op .k{ position:absolute; font-weight:900; color:#0b1f4d; line-height:1 } .op .st{ position:absolute; height:auto } .opb{ page-break-after:always }';
 // items: ['t', x, y, text, anchor('r'|'c'|'l'), sizeInPercentOfWidth]  |  ['k', x, y]  (tick)  |  ['s', x, y, widthPx, src] (stamp)
 function srOverlayPage(bg, W, H, items, widthPct){
+  if(window.__srCapture) window.__srOverlay = { bg:bg, W:W, H:H, items:items, widthPct:widthPct||100 };
   const pc = (v,t)=> (v/t*100).toFixed(3) + '%';
   let h = '<div class="op" style="width:' + (widthPct||100) + '%;aspect-ratio:' + W + '/' + H + '"><img class="bg" src="' + bg + '" alt=""><div class="oi">';
   items.forEach(function(it){
@@ -5882,6 +5884,80 @@ async function srRegistrationLetterPdf(rep, opts){
   x.textAlign = 'center'; x.font = 'bold 36px Tahoma, Arial, sans-serif'; x.fillText('إدارة العلاقات الحكومية', 330, y + 70);
   if(opts.stampSrc){ try{ const st = await srLoadImg(opts.stampSrc); const sw = 300, sh = st.height * sw / st.width; x.drawImage(st, 180, y + 95, sw, sh); }catch(e){} }
   return srCanvasToPdf(c);
+}
+
+// ===== Approved form -> PDF blob (so it can be shared / e-mailed as a file, not as text) =====
+// Runs the normal srPrint* function in "capture" mode (no window opens), then renders what it produced.
+function srToDataUrl(src){
+  if(/^data:/.test(src)) return Promise.resolve(src);
+  return fetch(src).then(function(r){ return r.blob(); }).then(function(b){
+    return new Promise(function(ok, no){ const fr = new FileReader(); fr.onload = function(){ ok(fr.result); }; fr.onerror = no; fr.readAsDataURL(b); });
+  });
+}
+function srDrawCheck(ctx, cx, cy, sz){
+  ctx.save(); ctx.strokeStyle = '#0b1f4d'; ctx.lineWidth = Math.max(2, sz * 0.16); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - sz * 0.42, cy + sz * 0.02); ctx.lineTo(cx - sz * 0.12, cy + sz * 0.34); ctx.lineTo(cx + sz * 0.46, cy - sz * 0.36); ctx.stroke(); ctx.restore();
+}
+async function srDrawOverlay(ov){
+  const CW = 1240, CH = 1754, c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, CW, CH);
+  const w = CW * ov.widthPct / 100, x0 = (CW - w) / 2, y0 = 18, s = w / ov.W;
+  g.drawImage(await srLoadImg(await srToDataUrl(ov.bg)), x0, y0, w, ov.H * s);
+  g.textBaseline = 'middle';
+  for(let i = 0; i < ov.items.length; i++){
+    const it = ov.items[i], X = x0 + it[1] * s, Y = y0 + it[2] * s;
+    if(it[0] === 't'){
+      if(!it[3]) continue;
+      const a = it[4] || 'r', px = (it[5] || 1.8) * w / 100, txt = String(it[3]);
+      g.font = '700 ' + px.toFixed(1) + 'px Tahoma, Arial, sans-serif'; g.fillStyle = '#0b1f4d';
+      g.direction = /[؀-ۿ]/.test(txt) ? 'rtl' : 'ltr';
+      g.textAlign = a === 'r' ? 'right' : a === 'l' ? 'left' : 'center';
+      g.fillText(txt, X, Y);
+    } else if(it[0] === 'k'){
+      srDrawCheck(g, X, Y, 2.5 * w / 100);
+    } else if(it[0] === 's' && it[4]){
+      const im = await srLoadImg(await srToDataUrl(it[4])), sw = it[3] * s;
+      g.drawImage(im, X - sw / 2, Y, sw, sw * im.naturalHeight / im.naturalWidth);
+    }
+  }
+  return c;
+}
+async function srRasterBody(cap){
+  const W = 794, host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + W + 'px;background:#fff';
+  const css = (SR_PRINT_CSS + cap.extraCss).replace(/(^|\n)body\{/, '$1.rst{');
+  host.innerHTML = '<div class="rst" dir="rtl" style="margin:0;font-family:Tahoma,Arial,sans-serif;color:#111;background:#fff;direction:rtl;width:' + W + 'px"><style>' + css + '</style><div class="doc">' + cap.bodyHtml + '</div></div>';
+  document.body.appendChild(host);
+  try{
+    const imgs = Array.from(host.querySelectorAll('img'));
+    await Promise.all(imgs.map(async function(im){ try{ im.src = await srToDataUrl(im.src); }catch(e){} }));
+    await Promise.all(imgs.map(function(im){ return im.decode ? im.decode().catch(function(){}) : null; }));
+    const root = host.firstChild;
+    let H = Math.ceil(root.scrollHeight);
+    const xml = new XMLSerializer().serializeToString(root);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '"><foreignObject x="0" y="0" width="100%" height="100%">' + xml + '</foreignObject></svg>';
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    const CW = 1240, CH = 1754, c = document.createElement('canvas'); c.width = CW; c.height = CH;
+    const g = c.getContext('2d');
+    for(let pass = 0; pass < 2; pass++){          // first pass warms up Safari's foreignObject renderer
+      const im = await srLoadImg(url);
+      g.fillStyle = '#fff'; g.fillRect(0, 0, CW, CH);
+      let sc = CW / W; if(H * sc > CH) sc = CH / H;
+      g.drawImage(im, (CW - W * sc) / 2, 0, W * sc, H * sc);
+    }
+    return c;
+  } finally { host.remove(); }
+}
+async function srApprovedPdfBlob(printFn){
+  let cap = null; window.__srOverlay = null; window.__srCapture = function(c){ cap = c; };
+  try{ printFn(); } finally { window.__srCapture = null; }
+  const ov = window.__srOverlay; window.__srOverlay = null;
+  if(!cap) throw new Error('no-capture');
+  const canvas = ov ? await srDrawOverlay(ov) : await srRasterBody(cap);
+  return srCanvasToPdf(canvas);
+}
+function srBlobToBase64(blob){
+  return new Promise(function(ok, no){ const fr = new FileReader(); fr.onload = function(){ ok(String(fr.result).split(',')[1]); }; fr.onerror = no; fr.readAsDataURL(blob); });
 }
 
 // ===== Photo tool: crop + remove a plain background + download / share (WhatsApp, e-mail ...) =====
@@ -6850,6 +6926,7 @@ function renderServiceRequests(root, ctx){
           <div class="sr-step-title" style="margin-top:18px">${esc(st.titleAr||'')}</div>
           ${st.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
         `).join('')}
+        <div class="field" style="margin-top:18px"><label>طريقة استلام النموذج المعتمد (ملف PDF)</label><select id="sr-w-delivery"><option value="whatsapp">واتساب</option><option value="email">الإيميل</option></select></div>
         <div class="sr-wizard-actions" style="margin-top:18px">
           <button class="btn ghost" id="sr-w-print" type="button">طباعة النموذج</button>
           <button class="btn primary" id="sr-w-next" type="button">إرسال الطلب</button>
@@ -6884,7 +6961,7 @@ function renderServiceRequests(root, ctx){
           ...(session.type==='employee'
             ? { submitter_type:'employee', submitter_name:session.name, submitter_phone:session.phone, submitter_email:session.email||'', company:session.company }
             : { rep_id: session.rep_id, submitter_type:'rep' }),
-          payload: wizardData,
+          payload: Object.assign({}, wizardData, { _delivery: ((root.querySelector('#sr-w-delivery')||{}).value || 'whatsapp') }),
         });
         if(res.ok){
           lastRequestId = res.id;
@@ -7069,6 +7146,55 @@ function renderServiceRequests(root, ctx){
     return m;
   }
 
+  // Approved form as a PDF file: shared from the admin's phone (WhatsApp / Mail) or e-mailed directly by the backend.
+  function openApprovalPdfPanel(r, def, label, payload, labels, note){
+    const delivery = (payload && payload._delivery) || (r.submitter_email && !r.submitter_phone ? 'email' : 'whatsapp');
+    const fname = (String(r.id || '').replace(/[^A-Za-z0-9_-]/g, '') || 'form') + '.pdf';
+    const text = 'السلام عليكم ' + (r.submitter_name || '') + '،\nمرفق النموذج المعتمد (' + label + ').' + (note ? '\nملاحظة: ' + note : '');
+    let blob = null, mailed = false;
+    const btn = 'display:block;width:100%;margin-top:10px;text-align:center;text-decoration:none';
+    const html = `
+      <div class="glass">
+        <div class="eyebrow">التصريح المعتمد — ملف PDF</div>
+        <p style="margin:10px 0 0;line-height:1.9">${esc(r.submitter_name || '')} — اختار استلام الملف عبر: <b>${delivery === 'email' ? 'الإيميل' : 'واتساب'}</b></p>
+        <div id="sr-ap-st" class="muted" style="margin:8px 0;min-height:22px">جار تجهيز ملف PDF...</div>
+        <button class="btn primary" id="sr-ap-share" style="${btn}" disabled>${delivery === 'email' ? '✉ إرسال الـPDF بالإيميل (من جوالك)' : '📎 إرسال الـPDF عبر واتساب'}</button>
+        ${r.submitter_email ? `<button class="btn" id="sr-ap-mail" style="${btn}" disabled>✉ إرسال الـPDF للإيميل مباشرة من النظام</button>` : ''}
+        ${r.submitter_phone ? `<a class="btn" id="sr-ap-wa" style="${btn}" href="${esc(srWaLink(r.submitter_phone, text))}" target="_blank" rel="noopener">فتح محادثة واتساب مع المستخدم</a>` : ''}
+        <button class="btn ghost" id="sr-ap-print" style="${btn}">طباعة / عرض النموذج</button>
+        <button class="btn ghost" id="sr-ap-close" style="${btn}">إغلاق</button>
+      </div>`;
+    ctx.openOverlay(html, (el)=>{
+      const st = el.querySelector('#sr-ap-st'), shareBtn = el.querySelector('#sr-ap-share'), mailBtn = el.querySelector('#sr-ap-mail');
+      el.querySelector('#sr-ap-close').addEventListener('click', ()=> ctx.closeOverlay());
+      el.querySelector('#sr-ap-print').addEventListener('click', ()=>{ ctx.closeOverlay(); printApproved(r, def, label, payload, labels, note); });
+      async function mailDirect(auto){
+        if(!r.submitter_email || !blob) return;
+        if(mailBtn) mailBtn.disabled = true;
+        st.textContent = 'جار الإرسال للإيميل...';
+        try{
+          const ver = await srApiGet(cfg.url, { token:cfg.token, action:'version' }).catch(()=>({}));
+          if(!ver || !ver.send_pdf){ st.textContent = 'الإرسال المباشر يحتاج تحديث الخلفية (v2.2) — استخدم زر الإرسال من جوالك'; if(mailBtn) mailBtn.disabled = false; return; }
+          const b64 = await srBlobToBase64(blob);
+          const res = await srApiPost(cfg.url, { token:cfg.token, admin_token:cfg.adminToken, action:'send_pdf', to:r.submitter_email, subject:'النموذج المعتمد — ' + label, body:text, filename:fname, pdf_base64:b64 });
+          if(res.ok){ mailed = true; st.textContent = '✅ تم إرسال الملف إلى ' + r.submitter_email; }
+          else { st.textContent = 'تعذر الإرسال المباشر (' + (res.error || '') + ') — استخدم زر الإرسال من جوالك'; if(mailBtn) mailBtn.disabled = false; }
+        }catch(e){ st.textContent = 'تعذر الاتصال بالخلفية — استخدم زر الإرسال من جوالك'; if(mailBtn) mailBtn.disabled = false; }
+      }
+      shareBtn.addEventListener('click', async ()=>{
+        if(!blob) return;
+        const res = await srShareFile(blob, fname, text);
+        if(res === 'downloaded') ctx.showToast('تم تنزيل الملف — أرفقه في واتساب أو الإيميل');
+      });
+      if(mailBtn) mailBtn.addEventListener('click', ()=> mailDirect(false));
+      srApprovedPdfBlob(()=> printApproved(r, def, label, payload, labels, note)).then(async (b)=>{
+        blob = b; shareBtn.disabled = false; st.textContent = 'ملف PDF جاهز (' + Math.round(b.size / 1024) + ' KB)';
+        if(mailBtn) mailBtn.disabled = false;
+        if(delivery === 'email' && r.submitter_email) await mailDirect(true);
+      }).catch(()=>{ st.textContent = 'تعذر تجهيز ملف PDF — استخدم «طباعة / عرض النموذج» ثم احفظه PDF'; });
+    });
+  }
+
   function printApproved(r, def, label, payload, labels, note){
     const stamp = srDefaultStamp();
     if(r.form_type === 'entry_permit'){
@@ -7089,7 +7215,7 @@ function renderServiceRequests(root, ctx){
       return;
     }
     const today = srToday();
-    const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>`<tr><td class="k">${esc(labels[k]||k)}</td><td>${esc(payload[k])}</td></tr>`).join('');
+    const rows = Object.keys(payload).filter(k=>k!=='visitors' && k.charAt(0)!=='_').map(k=>`<tr><td class="k">${esc(labels[k]||k)}</td><td>${esc(payload[k])}</td></tr>`).join('');
     srOpenPrintDoc(label, srLetterhead() + `
       <h1>${esc(label)}</h1>
       <table>
@@ -7109,7 +7235,7 @@ function renderServiceRequests(root, ctx){
     const label = def ? def.labelAr : r.form_type;
     const payload = r.payload || {};
     const labels = srLabelMap(def);
-    const rows = Object.keys(payload).filter(k=>k!=='visitors').map(k=>({k:labels[k]||k, v:payload[k]}));
+    const rows = Object.keys(payload).filter(k=>k!=='visitors' && k.charAt(0)!=='_').map(k=>({k:labels[k]||k, v:payload[k]}));
     const visitorsHtml = Array.isArray(payload.visitors) ? payload.visitors.map((v,i)=>`
       <div class="sr-detail-row"><span class="k">${r.form_type==='entry_permit' ? 'فرد' : (isAr?'زائر':'Visitor')} ${i+1}</span><span class="v">${esc(v.name)} — ${esc(v.nationality)} — ${esc(v.idNumber)}${v.englishName?(' — '+esc(v.englishName)):''}</span></div>
     `).join('') : '';
@@ -7151,12 +7277,11 @@ function renderServiceRequests(root, ctx){
             ctx.closeOverlay();
             if(newStatus==='معتمد'){ r.status='معتمد'; r.notes=note.trim(); }
             paintInbox();
-            if(r.submitter_phone || r.submitter_email){
-              const permitNo = (newStatus==='معتمد' && r.form_type==='entry_permit') ? srPermitNumber(r) : '';
-              const txt = newStatus==='معتمد'
-                ? 'السلام عليكم ' + (r.submitter_name||'') + '،\nتم اعتماد طلبكم (' + label + ')' + (permitNo ? '\nرقم التصريح: ' + permitNo : '') + (note.trim() ? '\nملاحظة: ' + note.trim() : '') + '\nيمكنكم الدخول إلى النظام لطباعة النموذج المعتمد.'
-                : 'السلام عليكم ' + (r.submitter_name||'') + '،\nنأسف، لم يتم اعتماد طلبكم (' + label + ')\nالسبب: ' + note.trim();
-              setTimeout(()=> openSharePanel({ title: newStatus==='معتمد' ? 'أرسل الاعتماد للمستخدم' : 'أرسل الرفض للمستخدم', phone: r.submitter_phone, email: r.submitter_email, subject: 'بخصوص طلبكم: ' + label, text: txt }), 150);
+            if(newStatus==='معتمد'){
+              setTimeout(()=> openApprovalPdfPanel(r, def, label, payload, labels, note.trim()), 150);
+            }else if(r.submitter_phone || r.submitter_email){
+              const txt = 'السلام عليكم ' + (r.submitter_name||'') + '،\nنأسف، لم يتم اعتماد طلبكم (' + label + ')\nالسبب: ' + note.trim();
+              setTimeout(()=> openSharePanel({ title:'أرسل الرفض للمستخدم', phone: r.submitter_phone, email: r.submitter_email, subject: 'بخصوص طلبكم: ' + label, text: txt }), 150);
             }
           }else{
             ctx.showToast(res.error==='admin_only' ? (isAr?'مفتاح الأدمن غير صحيح':'Wrong admin key') : (isAr?'تعذر التحديث':'Update failed'));

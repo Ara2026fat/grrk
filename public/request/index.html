@@ -652,6 +652,7 @@ function srToday(){ return new Date().toLocaleDateString('ar-SA-u-ca-gregory'); 
 
 function srFitOverlays(root){ if(window.CSS && CSS.supports && CSS.supports('width','1cqw')) return; (root||document).querySelectorAll('.op').forEach(function(o){ var i=o.querySelector('.oi'); if(i) i.style.fontSize = (o.clientWidth/100) + 'px'; }); }
 function srOpenPrintDoc(title, bodyHtml, extraCss){
+  if(window.__srCapture){ window.__srCapture({ title:title, bodyHtml:bodyHtml, extraCss:extraCss||'' }); return true; }
   const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + srEsc(title) + '</title><style>' + SR_PRINT_CSS + (extraCss||'') + '</style></head><body><div class="bar"><button onclick="window.print()">طباعة / حفظ PDF</button> <button onclick="srBack()" style="margin-inline-start:10px;background:#dbe4ff">↩ رجوع للتطبيق</button></div><script>function srBack(){ try{ window.close(); }catch(e){} setTimeout(function(){ if(window.opener){ try{ window.opener.focus(); }catch(e){} } else { history.back(); } },150); }function srFit(){ if(window.CSS&&CSS.supports&&CSS.supports("width","1cqw")) return; document.querySelectorAll(".op").forEach(function(o){ var i=o.querySelector(".oi"); if(i) i.style.fontSize=(o.clientWidth/100)+"px"; }); } window.addEventListener("load",srFit); window.addEventListener("resize",srFit); window.addEventListener("beforeprint",srFit); window.addEventListener("afterprint",srFit); function srOne(on){ var d=document.querySelector(".doc"); if(!d||d.querySelector(".op")) return; d.style.zoom=1; if(on){ var h=d.scrollHeight, max=1020; if(h>max) d.style.zoom=(max/h).toFixed(3); } } window.addEventListener("beforeprint",function(){srOne(true)}); window.addEventListener("afterprint",function(){srOne(false)});<\/script><div class="doc">' + bodyHtml + '</div></body></html>';
   const w = window.open('', '_blank');
   if(w){ w.document.open(); w.document.write(html); w.document.close(); return true; }
@@ -732,6 +733,7 @@ function srPrintPermit(r, persons, from, to, supervisor, company, stampSrc, titl
 const SR_OVERLAY_CSS = '@page{ size:A4; margin:0 } @media print{ .doc{ padding:0!important } } .op{ position:relative; margin:0 auto; line-height:1; container-type:inline-size } .op .oi{ position:absolute; left:0; top:0; width:100%; height:100%; font-size:1cqw } .op img.bg{ width:100%; display:block } .op .t{ position:absolute; white-space:nowrap; font-weight:700; color:#0b1f4d; font-family:Tahoma,Arial,sans-serif; unicode-bidi:plaintext } .op .k{ position:absolute; font-weight:900; color:#0b1f4d; line-height:1 } .op .st{ position:absolute; height:auto } .opb{ page-break-after:always }';
 // items: ['t', x, y, text, anchor('r'|'c'|'l'), sizeInPercentOfWidth]  |  ['k', x, y]  (tick)  |  ['s', x, y, widthPx, src] (stamp)
 function srOverlayPage(bg, W, H, items, widthPct){
+  if(window.__srCapture) window.__srOverlay = { bg:bg, W:W, H:H, items:items, widthPct:widthPct||100 };
   const pc = (v,t)=> (v/t*100).toFixed(3) + '%';
   let h = '<div class="op" style="width:' + (widthPct||100) + '%;aspect-ratio:' + W + '/' + H + '"><img class="bg" src="' + bg + '" alt=""><div class="oi">';
   items.forEach(function(it){
@@ -1547,6 +1549,7 @@ function startApp(){
           <div class="sr-step-title" style="margin-top:18px">${esc(st.titleAr||'')}</div>
           ${st.fields.map(f=> f.type==='visitorsTable' ? renderVisitorsTable() : renderFieldInput(f)).join('')}
         `).join('')}
+        <div class="field" style="margin-top:18px"><label>طريقة استلام النموذج المعتمد (ملف PDF)</label><select id="sr-w-delivery"><option value="whatsapp">واتساب</option><option value="email">الإيميل</option></select></div>
         <div class="sr-wizard-actions" style="margin-top:18px">
           <button class="btn ghost" id="sr-w-print" type="button">طباعة النموذج</button>
           <button class="btn primary" id="sr-w-next" type="button">إرسال الطلب</button>
@@ -1581,7 +1584,7 @@ function startApp(){
           ...(session.type==='employee'
             ? { submitter_type:'employee', submitter_name:session.name, submitter_phone:session.phone, submitter_email:session.email||'', company:session.company }
             : { rep_id: session.rep_id, submitter_type:'rep' }),
-          payload: wizardData,
+          payload: Object.assign({}, wizardData, { _delivery: ((root.querySelector('#sr-w-delivery')||{}).value || 'whatsapp') }),
         });
         if(res.ok){
           lastRequestId = res.id;

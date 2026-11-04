@@ -154,6 +154,10 @@ function doPost(e) {
       if (body.admin_token !== ADMIN_TOKEN) return jsonOut_({ ok: false, error: 'admin_only' });
       return withLock_(function(){ return setRepStatus_(body); });
     }
+    if (body.action === 'send_pdf') {
+      if (body.admin_token !== ADMIN_TOKEN) return jsonOut_({ ok: false, error: 'admin_only' });
+      return sendPdf_(body);
+    }
     if (body.action === 'register_rep') {
       return withLock_(function(){ return registerRep_(body); });
     }
@@ -162,6 +166,17 @@ function doPost(e) {
   } catch (err) {
     return jsonOut_({ ok: false, error: String(err) });
   }
+}
+
+// Emails the approved form (PDF built in the admin app) directly to the user.
+function sendPdf_(body) {
+  const to = String(body.to || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return jsonOut_({ ok: false, error: 'bad_email' });
+  if (!body.pdf_base64) return jsonOut_({ ok: false, error: 'no_pdf' });
+  const name = String(body.filename || 'document.pdf').replace(/[^A-Za-z0-9._-]/g, '_');
+  const blob = Utilities.newBlob(Utilities.base64Decode(body.pdf_base64), 'application/pdf', name);
+  MailApp.sendEmail({ to: to, subject: String(body.subject || 'النموذج المعتمد'), body: String(body.body || ''), attachments: [blob] });
+  return jsonOut_({ ok: true });
 }
 
 function createRequest_(body) {
@@ -290,6 +305,10 @@ function doGet(e) {
         return obj;
       });
     return jsonOut_({ ok: true, requests: rows });
+  }
+
+  if (params.action === 'version') {
+    return jsonOut_({ ok: true, version: '2.2', send_pdf: true });
   }
 
   return jsonOut_({ ok: false, error: 'unknown_action' });
